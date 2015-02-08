@@ -5,51 +5,11 @@
 
 using namespace std;
 
-#define MSG 0
+//to compile: mpic++ Problem1.cpp
+//to run: mpiexec -n 8 a.out
 
-int NNodes, Me;
-int n, m;
-int *x;
-int chunkIndex, chunkSize;
+int nnodes, me;
 
-void init(int argc, char **argv)
-{
-	MPI_Init(&argc, &argv);
-	MPI_Comm_size(MPI_COMM_WORLD, &NNodes);
-	MPI_Comm_rank(MPI_COMM_WORLD, &Me);
-/*
-	ifstream myFile;
-	myFile.open(argv[1]);
-
-	myFile >> n;
-	myFile >> m;
-		
-	x = new int[n];
-	for (int i=0; i<n; i++)
-		myFile >> x[i];
-*/
-/*	
-	int maxPatterns = n-m+1;
-	if (Me == 0)
-		chunkIndex = 0;
-	else
-	{
-		for (int i=0; i<NNodes; i++)
-		{
-			chunkIndex += maxPatterns/NNodes;
-			if (i < maxPatterns%NNodes)
-				chunkIndex++;
-		}//for
-	}//else
-		
-	chunkSize = maxPatterns/NNodes;
-	if (Me < maxPatterns%NNodes)
-		chunkSize++;
-*/
-}//init
-
-
-/*
 struct entry
 {
 	int count;
@@ -159,7 +119,7 @@ public:
 
 };//Hash
 
-
+/*
 int getChunkIndex(int n, int m, int currentThread, int numThreads)
 {
 	//find what chunk the thread will be working on
@@ -251,38 +211,52 @@ int *numcount(int *x, int n, int m)
 }//numcount
 */
 
-int main(int argc, char *argv[])
+int * numcount(int * x, int n, int m)
 {
-	init(argc, argv);
-	int send = 9;
-	int rec;
-	MPI_Status status;
+	int maxPatterns = n-m+1;
+	int chunkIndex = 0;
+	int chunkSize = maxPatterns/nnodes;
 
-	cout << "before send" << endl;
-	cout << Me << endl;
-	MPI_Send(&send, 1, MPI_INT, 1, MSG, MPI_COMM_WORLD);
-	cout << "lol" << endl;
-//	MPI_Recv(&rec, 1, MPI_INT, 1, MSG, MPI_COMM_WORLD, &status);
+	//find chnunk index
+	if (me != 0)
+	{
+		for (int i=0; i<me; i++)
+		{
+			chunkIndex += (maxPatterns)/nnodes;
+			if (i < (maxPatterns)%nnodes)
+				chunkIndex++;			
+		}//for
+	}//for
 
-	cout << rec << endl;
-	MPI_Finalize();
-/*	
+	//find chunk size	
+	if (me < maxPatterns%nnodes)
+		chunkSize++;
+}//numcount
+
+
+void init(int argc, char **argv)
+{
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &nnodes);
+	MPI_Comm_rank(MPI_COMM_WORLD, &me);
+}//init
+
+
+int main(int argc, char *argv[])
+{	
 	int n, m;
-	cin >> n;
-	cin >> m;
-		
-	//get array values
-	int *x = new int[n];
-	for (int i=0; i<n; i++)
-		cin >> x[i];
-	
-	int * output = numcount(x, n, m);
-	for (int i=0; i<output[0]*(m+1) + 1; i++)
-		cout << output[i] << " ";
-	cout << endl;
+	ifstream myFile(argv[1]);
+	myFile >> n;
+	myFile >> m;
 
-	delete[] x;
-	return 0;
-*/
+	int * x = new int[n];
+	for (int i=0; i<n; i++)
+		myFile >> x[i];
+	
+	init(argc, argv);
+	numcount(x, n, m);	
+	MPI_Finalize();
+
+	delete [] x;
 }//main	
 																																			
