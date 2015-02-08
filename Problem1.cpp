@@ -6,7 +6,7 @@
 using namespace std;
 
 //to compile: mpic++ Problem1.cpp
-//to run: mpiexec -n 8 a.out
+//to run: mpiexec -n 8 a.out <filename>
 
 int nnodes, me;
 
