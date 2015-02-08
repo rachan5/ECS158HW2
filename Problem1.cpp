@@ -6,15 +6,15 @@
 using namespace std;
 
 //to compile: mpic++ Problem1.cpp
-//to run: mpiexec -n 8 a.out <filename>
+//to run: mpiexec -n 8 a.out
 
 int nnodes, me;
 
 struct entry
 {
 	int count;
-	entry * next;
 	int * pattern;
+	entry * next;
 };//entry
 
 class Hash
@@ -34,19 +34,27 @@ public:
 		{
 			hashTable[i] = new entry;
 			hashTable[i]->count = 0;
-			hashTable[i]->next = NULL;
 			hashTable[i]->pattern = NULL;
+			hashTable[i]->next = NULL;
 		}//for
 	}//Constructor
 	~Hash()
 	{
+		delete [] itemCount;
+		entry * temp;
+		entry * tempNext;
 		for(int i=0; i<tableSize; i++)
 		{
-			if (hashTable[i]->next)
-				delete [] hashTable[i]->next;
-			if (hashTable[i]->pattern)
-				delete [] hashTable[i]->pattern;
-			delete [] hashTable[i];
+			temp = hashTable[i];
+			while(temp)
+			{
+				tempNext = temp->next;
+				if (temp->pattern)
+					delete [] temp->pattern;				
+				delete temp;
+				temp = tempNext;
+			}//while
+			hashTable[i] = NULL;
 		}//for
 		delete [] hashTable;
 	}//destructor
@@ -74,6 +82,7 @@ public:
 			}//for
 			ptr = ptr->next;
 		}//while
+		return false;
 	}//patternMatch
 
 	int hashFunction(int * pattern)
@@ -104,10 +113,10 @@ public:
 			entry * ptr = hashTable[index];
 			
 			entry * newPattern = new entry;
+			newPattern->count += c;
 			newPattern->pattern = new int[patternLength];
 			for (int i=0; i<patternLength; i++)
 				newPattern->pattern[i] = pattern[i];
-			newPattern->count += c;
 			newPattern->next = NULL;
 			while(ptr->next)
 				ptr = ptr->next;
@@ -120,22 +129,6 @@ public:
 };//Hash
 
 /*
-int getChunkIndex(int n, int m, int currentThread, int numThreads)
-{
-	//find what chunk the thread will be working on
-	if (currentThread == 0) return 0;
-	unsigned int maxPatterns = n-m+1;
-	int chunkIndex = 0;
-	for (int i=0; i<currentThread; i++)
-	{
-		chunkIndex += (maxPatterns)/numThreads;
-		if (i < (maxPatterns)%numThreads)
-			chunkIndex++;			
-	}//for
-	return chunkIndex;
-}//getChunkIndex
-
-
 int *numcount(int *x, int n, int m)
 {
 	//split array into chunks and compute each chunk in parallel
@@ -231,6 +224,32 @@ int * numcount(int * x, int n, int m)
 	//find chunk size	
 	if (me < maxPatterns%nnodes)
 		chunkSize++;
+	
+	Hash nodeTable(chunkSize, m);	
+
+	//count patterns
+	for (int i=0; i<chunkSize; i++)
+	{
+		int pattern[m];
+		for (int j=0; j<m; j++)
+		{
+			pattern[j] = x[chunkIndex+i+j];
+		}//for
+		nodeTable.insert(pattern, 1);
+	}//for
+
+	for(int i=0; i<chunkSize; i++)
+	{
+		if (nodeTable.getHashTable()[i]->count != 0)		
+		{
+			entry * ptr = nodeTable.getHashTable()[i];
+			for (int j=0; j<nodeTable.getItemCount()[i]; j++)
+			{
+				int * patt = ptr->pattern;
+				ptr = ptr->next;
+			}//for
+		}//if
+	}//for
 }//numcount
 
 
