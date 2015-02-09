@@ -15,6 +15,16 @@ To run on CSIF:
 
 ##Problem 2
 
+**Scheduling clauses** [(copied from wiki)](http://en.wikipedia.org/wiki/OpenMP#Scheduling_clauses)
+
+*schedule(type, chunk)*: This is useful if the work sharing construct is a do-loop or for-loop. The iteration(s) in the work sharing construct are assigned to threads according to the scheduling method defined by this clause. The three types of scheduling are:
+
+1. *static*: Here, all the threads are allocated iterations before they execute the loop iterations. The iterations are divided among threads equally by default. However, specifying an integer for the parameter chunk will allocate chunk number of contiguous iterations to a particular thread.
+
+2. *dynamic*: Here, some of the iterations are allocated to a smaller number of threads. Once a particular thread finishes its allocated iteration, it returns to get another one from the iterations that are left. The parameter chunk defines the number of contiguous iterations that are allocated to a thread at a time.
+
+3. *guided*: A large chunk of contiguous iterations are allocated to each thread dynamically (as above). The chunk size decreases exponentially with each successive allocation to a minimum size specified in the parameter chunk
+
 ## Misc.
 ### To run RSnowExample.R on CSIF
 	Rscript RSnowExample.R
