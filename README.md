@@ -13,6 +13,10 @@ To run on CSIF:
 
 **Bryan- What's the current status of the program?**
 
+Currently, all nodes take a chunk, process it and pass it to the last node. This is very slow I think because sends and receives are expensive. So, some nodes need to receive from others and all the burden cant be on the last node.
+
+Also we are currently sending just ints, which probably slows things down a ton. Ill look into the vector or maybe something else.
+
 ##Problem 2
 
 ***Ray's current idea is to mirror what Matloff's doing in Quiz 2'R mandelbrot function and use OpenMP instead of RSnow***
