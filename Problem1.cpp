@@ -8,6 +8,9 @@ using namespace std;
 //to compile: mpic++ Problem1.cpp
 //to run: mpiexec -n 8 a.out
 
+#define PIPE_MSG 0
+#define END_MSG 1
+
 int nnodes, me;
 
 struct entry
@@ -82,6 +85,7 @@ public:
 			}//for
 			ptr = ptr->next;
 		}//while
+
 		return false;
 	}//patternMatch
 
@@ -99,10 +103,10 @@ public:
 		if (hashTable[index]->count == 0)
 		{
 			itemCount[index] = 1;
+			hashTable[index]->count += c;
 			hashTable[index]->pattern = new int[patternLength];
 			for(int i=0; i<patternLength; i++)
 				hashTable[index]->pattern[i] = pattern[i];
-			hashTable[index]->count += c;
 			numPatterns++;	
 		}//if
 		else if (patternMatch(hashTable[index], pattern, c))
@@ -113,7 +117,7 @@ public:
 			entry * ptr = hashTable[index];
 			
 			entry * newPattern = new entry;
-			newPattern->count += c;
+			newPattern->count = c;
 			newPattern->pattern = new int[patternLength];
 			for (int i=0; i<patternLength; i++)
 				newPattern->pattern[i] = pattern[i];
@@ -128,83 +132,8 @@ public:
 
 };//Hash
 
-/*
-int *numcount(int *x, int n, int m)
-{
-	//split array into chunks and compute each chunk in parallel
-	unsigned int maxPatterns = n-m+1;
-	//initialize pattern table
-	Hash patternTable(maxPatterns, m);
-	int * outputArray;
-	int outputIndex = 0;
-	
-	#pragma omp parallel
-	{
-		int currentThread = omp_get_thread_num();
-		int numThreads = omp_get_num_threads();
-		int chunkIndex = getChunkIndex(n, m, currentThread, numThreads);
-		int chunkSize = maxPatterns/numThreads;
-		if (currentThread < maxPatterns%numThreads)
-			chunkSize++;
 
-		Hash threadTable(chunkSize, m);	
-	
-		//each thread finds patterns in a chunk of the array
-		for (int i=0; i<chunkSize; i++)
-		{
-			int pattern[m];
-			for (int j=0; j<m; j++)
-				pattern[j] = x[chunkIndex+i+j];
-			threadTable.insert(pattern, 1);
-		}//for
-		
-		#pragma omp critical
-		{
-			for (int i=0; i<chunkSize; i++)
-			{
-				if (!threadTable.getHashTable()[i]->count == 0)
-				{
-					entry * ptr = threadTable.getHashTable()[i];
-					for (int j=0; j<threadTable.getItemCount()[i]; j++)
-					{
-						int * patt = ptr->pattern;
-						patternTable.insert(patt, ptr->count);
-						ptr = ptr->next;
-					}//for
-				}//if
-			}//for
-		}//lock		
-		#pragma omp barrier
-		{
-			#pragma omp single
-			{
-				outputArray = new int[patternTable.getNumPatterns()*(m+1) + 1];		
-				outputArray[outputIndex++] = patternTable.getNumPatterns();
-			}//single
-		}//barrier
-	}//omp parallel		
-
-	//set values of output array
-	#pragma omp for schedule(dynamic)
-	for (int i=0; i<maxPatterns; i++)
-	{	
-		if (!patternTable.getHashTable()[i]->count == 0)
-		{	
-			entry * ptr = patternTable.getHashTable()[i];
-			for (int j=0; j<patternTable.getItemCount()[i]; j++)
-			{
-				for (int k=0; k<m; k++)
-					outputArray[outputIndex++] = ptr->pattern[k];
-				outputArray[outputIndex++] = ptr->count;
-				ptr = ptr->next;
-			}//for
-		}//if
-	}//for
-	return outputArray;
-}//numcount
-*/
-
-int * numcount(int * x, int n, int m)
+void nodeWorker(int * x, int n, int m)
 {
 	int maxPatterns = n-m+1;
 	int chunkIndex = 0;
@@ -238,6 +167,8 @@ int * numcount(int * x, int n, int m)
 		nodeTable.insert(pattern, 1);
 	}//for
 
+	int sendData;
+	//send patterns to other nodes
 	for(int i=0; i<chunkSize; i++)
 	{
 		if (nodeTable.getHashTable()[i]->count != 0)		
@@ -245,11 +176,104 @@ int * numcount(int * x, int n, int m)
 			entry * ptr = nodeTable.getHashTable()[i];
 			for (int j=0; j<nodeTable.getItemCount()[i]; j++)
 			{
-				int * patt = ptr->pattern;
+				for (int k=0; k<m; k++)
+				{
+					sendData = ptr->pattern[k];
+					MPI_Send(&sendData, 1, MPI_INT, nnodes-1, PIPE_MSG, MPI_COMM_WORLD);
+				}//for
+				sendData = ptr->count;
+				MPI_Send(&sendData, 1, MPI_INT, nnodes-1, PIPE_MSG, MPI_COMM_WORLD);
 				ptr = ptr->next;
 			}//for
 		}//if
 	}//for
+
+	//send end message
+	MPI_Send(&sendData, 1, MPI_INT, nnodes-1, END_MSG, MPI_COMM_WORLD);
+}//nodeWorker
+
+
+int * numcount(int * x, int n, int m)
+{	
+	int maxPatterns = n-m+1;
+	int chunkIndex = 0;
+	int chunkSize = maxPatterns/nnodes;
+	int * outputArray;
+	int outputIndex = 0;	
+
+	//find chnunk index
+	if (me != 0)
+	{
+		for (int i=0; i<me; i++)
+		{
+			chunkIndex += (maxPatterns)/nnodes;
+			if (i < (maxPatterns)%nnodes)
+				chunkIndex++;			
+		}//for
+	}//for
+
+	//find chunk size	
+	if (me < maxPatterns%nnodes)
+		chunkSize++;
+	
+	Hash patternTable(maxPatterns, m);	
+	
+	//count patterns
+	for (int i=0; i<chunkSize; i++)
+	{
+		int pattern[m];
+		for (int j=0; j<m; j++)
+		{
+			pattern[j] = x[chunkIndex+i+j];
+		}//for
+		patternTable.insert(pattern, 1);
+	}//for
+
+	int recvData;
+	int * recvPattern = new int[m]; 
+	int recvIndex = 0;
+	MPI_Status status;
+	//receive from other nodes and insert
+	for (int i=0; i<nnodes-1; i++)
+	{
+		while (1)
+		{			
+			MPI_Recv(&recvData, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			if (status.MPI_TAG == END_MSG)
+				break;
+
+			if (recvIndex < m)
+				recvPattern[recvIndex++] = recvData;
+			else
+			{
+				recvIndex = 0;
+				patternTable.insert(recvPattern, recvData);
+			}//else
+		}//while
+	}//for
+
+
+	outputArray = new int[patternTable.getNumPatterns()*(m+1) + 1];
+	outputArray[outputIndex++] = patternTable.getNumPatterns();
+	//set values of output array
+	for (int i=0; i<maxPatterns; i++)
+	{
+		if (patternTable.getHashTable()[i]->count != 0)
+		{
+			entry * ptr = patternTable.getHashTable()[i];
+			for (int j=0; j<patternTable.getItemCount()[i]; j++)
+			{
+				for (int k=0; k<m; k++)
+					outputArray[outputIndex++] = ptr->pattern[k];
+				outputArray[outputIndex++] = ptr->count;
+				ptr = ptr->next;
+			}//for
+		}//if
+	}//for
+
+	delete [] recvPattern;
+	return outputArray;
+
 }//numcount
 
 
@@ -273,9 +297,16 @@ int main(int argc, char *argv[])
 		myFile >> x[i];
 	
 	init(argc, argv);
-	numcount(x, n, m);	
-	MPI_Finalize();
+	if (me == nnodes-1)
+	{
+		int * output = numcount(x, n, m);	
+//		for (int i=0; i<output[0]*(m+1) + 1; i++)
+//			cout << output[i] << " ";
+// 		cout << endl;
+	}//if
+	else
+		nodeWorker(x, n, m);
 
+	MPI_Finalize();
 	delete [] x;
 }//main	
-																																			
