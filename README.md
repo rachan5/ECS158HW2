@@ -15,7 +15,7 @@ To run on CSIF:
 
 ##Problem 2
 
-**Scheduling clauses** [(copied from wiki)](http://en.wikipedia.org/wiki/OpenMP#Scheduling_clauses)
+### **Scheduling clauses** [(copied from wiki)](http://en.wikipedia.org/wiki/OpenMP#Scheduling_clauses)
 
 *schedule(type, chunk)*: This is useful if the work sharing construct is a do-loop or for-loop. The iteration(s) in the work sharing construct are assigned to threads according to the scheduling method defined by this clause. The three types of scheduling are:
 
@@ -24,6 +24,27 @@ To run on CSIF:
 2. *dynamic*: Here, some of the iterations are allocated to a smaller number of threads. Once a particular thread finishes its allocated iteration, it returns to get another one from the iterations that are left. The parameter chunk defines the number of contiguous iterations that are allocated to a thread at a time.
 
 3. *guided*: A large chunk of contiguous iterations are allocated to each thread dynamically (as above). The chunk size decreases exponentially with each successive allocation to a minimum size specified in the parameter chunk
+
+###**Interfacing between R and C** [(summary of this)](http://www.biostat.jhsph.edu/~bcaffo/statcomp/files/dotCall.pdf)
+
+#### cd into Problem2/InterfaceRC
+
+#### To compile:
+
+	R CMD SHLIB vecSum.c
+	or
+	R CMD SHILB ab.c
+
+#### To run (in R):
+
+	> .Call("vecSum", c(1,2,3))
+	The value is: 6.000000
+	NULL
+
+	> dyn.load("ab.so")
+	> .Call("ab", 1, 5)
+	[1] 1 2 3 4 5
+
 
 ## Misc.
 ### To run RSnowExample.R on CSIF
