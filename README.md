@@ -15,6 +15,8 @@ To run on CSIF:
 
 ##Problem 2
 
+***Ray's current idea is to mirror what Matloff's doing in Quiz 2'R mandelbrot function and use OpenMP instead of RSnow***
+
 ### **Scheduling clauses** [(copied from wiki)](http://en.wikipedia.org/wiki/OpenMP#Scheduling_clauses)
 
 *schedule(type, chunk)*: This is useful if the work sharing construct is a do-loop or for-loop. The iteration(s) in the work sharing construct are assigned to threads according to the scheduling method defined by this clause. The three types of scheduling are:
