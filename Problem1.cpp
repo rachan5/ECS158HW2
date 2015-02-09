@@ -167,7 +167,8 @@ void nodeWorker(int * x, int n, int m)
 		nodeTable.insert(pattern, 1);
 	}//for
 
-	int sendData;
+/*
+	int sendData[m+1];
 	//send patterns to other nodes
 	for(int i=0; i<chunkSize; i++)
 	{
@@ -177,19 +178,17 @@ void nodeWorker(int * x, int n, int m)
 			for (int j=0; j<nodeTable.getItemCount()[i]; j++)
 			{
 				for (int k=0; k<m; k++)
-				{
-					sendData = ptr->pattern[k];
-					MPI_Send(&sendData, 1, MPI_INT, nnodes-1, PIPE_MSG, MPI_COMM_WORLD);
-				}//for
-				sendData = ptr->count;
-				MPI_Send(&sendData, 1, MPI_INT, nnodes-1, PIPE_MSG, MPI_COMM_WORLD);
+					sendData[k] = ptr->pattern[k];
+				sendData[m] = ptr->count;
+				MPI_Send(&sendData, m+1, MPI_INT, nnodes-1, PIPE_MSG, MPI_COMM_WORLD);
 				ptr = ptr->next;
 			}//for
 		}//if
 	}//for
 
 	//send end message
-	MPI_Send(&sendData, 1, MPI_INT, nnodes-1, END_MSG, MPI_COMM_WORLD);
+	MPI_Send(&sendData, m+1, MPI_INT, nnodes-1, END_MSG, MPI_COMM_WORLD);
+*/
 }//nodeWorker
 
 
@@ -199,7 +198,7 @@ int * numcount(int * x, int n, int m)
 	int chunkIndex = 0;
 	int chunkSize = maxPatterns/nnodes;
 	int * outputArray;
-	int outputIndex = 0;	
+	int outputIndex = 0;
 
 	//find chnunk index
 	if (me != 0)
@@ -228,27 +227,22 @@ int * numcount(int * x, int n, int m)
 		}//for
 		patternTable.insert(pattern, 1);
 	}//for
-
-	int recvData;
-	int * recvPattern = new int[m]; 
-	int recvIndex = 0;
+/*
+	int recvData[m+1];
+	int recvPattern[m]; 
 	MPI_Status status;
 	//receive from other nodes and insert
 	for (int i=0; i<nnodes-1; i++)
 	{
 		while (1)
 		{			
-			MPI_Recv(&recvData, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			MPI_Recv(&recvData, m+1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 			if (status.MPI_TAG == END_MSG)
 				break;
 
-			if (recvIndex < m)
-				recvPattern[recvIndex++] = recvData;
-			else
-			{
-				recvIndex = 0;
-				patternTable.insert(recvPattern, recvData);
-			}//else
+			for (int j=0; j<m; j++)
+				recvPattern[j] = recvData[j];
+			patternTable.insert(recvPattern, recvData[m]);
 		}//while
 	}//for
 
@@ -271,9 +265,8 @@ int * numcount(int * x, int n, int m)
 		}//if
 	}//for
 
-	delete [] recvPattern;
 	return outputArray;
-
+*/
 }//numcount
 
 
@@ -299,7 +292,8 @@ int main(int argc, char *argv[])
 	init(argc, argv);
 	if (me == nnodes-1)
 	{
-		int * output = numcount(x, n, m);	
+		numcount(x, n, m);
+		//int * output = numcount(x, n, m);	
 //		for (int i=0; i<output[0]*(m+1) + 1; i++)
 //			cout << output[i] << " ";
 // 		cout << endl;
