@@ -140,35 +140,48 @@ void nodeWorker(int * x, int n, int m)
 	int chunkSize = maxPatterns/nnodes;
 
 	//find chnunk index
-	if (me != 0)
+	for (int i=0; i<me; i++)
 	{
-		for (int i=0; i<me; i++)
-		{
-			chunkIndex += (maxPatterns)/nnodes;
-			if (i < (maxPatterns)%nnodes)
-				chunkIndex++;			
-		}//for
+		chunkIndex += (maxPatterns)/nnodes;
+		if (i < (maxPatterns)%nnodes)
+			chunkIndex++;			
 	}//for
 
 	//find chunk size	
 	if (me < maxPatterns%nnodes)
 		chunkSize++;
+
+	//chunkSize = chunkSize * (me+1);
 	
 	Hash nodeTable(chunkSize, m);	
 
 	//count patterns
+	int pattern[m];
 	for (int i=0; i<chunkSize; i++)
 	{
-		int pattern[m];
 		for (int j=0; j<m; j++)
-		{
 			pattern[j] = x[chunkIndex+i+j];
-		}//for
 		nodeTable.insert(pattern, 1);
 	}//for
 
-/*
-	int sendData[m+1];
+
+	int srData[m+1]; //send and receive data
+	if (me != 0)
+	{
+		MPI_Status status;
+		while (1)
+		{			
+			MPI_Recv(&srData, m+1, MPI_INT, me-1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			if (status.MPI_TAG == END_MSG)
+				break;
+
+			for(int i=0; i<m; i++)
+				pattern[i] = srData[i];
+
+			nodeTable.insert(pattern, srData[m]);
+		}//while
+	}//if	
+
 	//send patterns to other nodes
 	for(int i=0; i<chunkSize; i++)
 	{
@@ -178,17 +191,16 @@ void nodeWorker(int * x, int n, int m)
 			for (int j=0; j<nodeTable.getItemCount()[i]; j++)
 			{
 				for (int k=0; k<m; k++)
-					sendData[k] = ptr->pattern[k];
-				sendData[m] = ptr->count;
-				MPI_Send(&sendData, m+1, MPI_INT, nnodes-1, PIPE_MSG, MPI_COMM_WORLD);
+					srData[k] = ptr->pattern[k];
+				srData[m] = ptr->count;
+				MPI_Send(&srData, m+1, MPI_INT, me+1, PIPE_MSG, MPI_COMM_WORLD);
 				ptr = ptr->next;
 			}//for
 		}//if
 	}//for
 
 	//send end message
-	MPI_Send(&sendData, m+1, MPI_INT, nnodes-1, END_MSG, MPI_COMM_WORLD);
-*/
+	MPI_Send(&srData, m+1, MPI_INT, me+1, END_MSG, MPI_COMM_WORLD);
 }//nodeWorker
 
 
@@ -201,14 +213,11 @@ int * numcount(int * x, int n, int m)
 	int outputIndex = 0;
 
 	//find chnunk index
-	if (me != 0)
+	for (int i=0; i<me; i++)
 	{
-		for (int i=0; i<me; i++)
-		{
-			chunkIndex += (maxPatterns)/nnodes;
-			if (i < (maxPatterns)%nnodes)
-				chunkIndex++;			
-		}//for
+		chunkIndex += (maxPatterns)/nnodes;
+		if (i < (maxPatterns)%nnodes)
+			chunkIndex++;			
 	}//for
 
 	//find chunk size	
@@ -218,35 +227,33 @@ int * numcount(int * x, int n, int m)
 	Hash patternTable(maxPatterns, m);	
 	
 	//count patterns
+	int pattern[m];
 	for (int i=0; i<chunkSize; i++)
 	{
-		int pattern[m];
 		for (int j=0; j<m; j++)
-		{
 			pattern[j] = x[chunkIndex+i+j];
-		}//for
 		patternTable.insert(pattern, 1);
 	}//for
-/*
+
 	int recvData[m+1];
-	int recvPattern[m]; 
+	int recvPattern[m];
 	MPI_Status status;
-	//receive from other nodes and insert
-	for (int i=0; i<nnodes-1; i++)
-	{
+
+//	for (int i=0; i<nnodes-1; i++)
+//	{
 		while (1)
 		{			
-			MPI_Recv(&recvData, m+1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			MPI_Recv(&recvData, m+1, MPI_INT, me-1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 			if (status.MPI_TAG == END_MSG)
 				break;
 
 			for (int j=0; j<m; j++)
-				recvPattern[j] = recvData[j];
+				recvPattern[j] = recvData[j];			
+
 			patternTable.insert(recvPattern, recvData[m]);
 		}//while
-	}//for
-
-
+//	}//for
+	
 	outputArray = new int[patternTable.getNumPatterns()*(m+1) + 1];
 	outputArray[outputIndex++] = patternTable.getNumPatterns();
 	//set values of output array
@@ -266,7 +273,6 @@ int * numcount(int * x, int n, int m)
 	}//for
 
 	return outputArray;
-*/
 }//numcount
 
 
@@ -292,8 +298,7 @@ int main(int argc, char *argv[])
 	init(argc, argv);
 	if (me == nnodes-1)
 	{
-		numcount(x, n, m);
-		//int * output = numcount(x, n, m);	
+		int * output = numcount(x, n, m);	
 //		for (int i=0; i<output[0]*(m+1) + 1; i++)
 //			cout << output[i] << " ";
 // 		cout << endl;
