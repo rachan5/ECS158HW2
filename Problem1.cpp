@@ -33,8 +33,8 @@ public:
 	Hash() {}	
 	Hash(int maxPatterns, int m) : tableSize(maxPatterns), patternLength(m), numPatterns(0)
 	{
+		itemCount = new int[tableSize];	
 		hashTable = new entry*[tableSize];
-		itemCount = new int[tableSize];
 		for (int i=0; i<tableSize; i++)
 		{
 			hashTable[i] = new entry;
@@ -88,26 +88,23 @@ public:
 			}//for
 			ptr = ptr->next;
 		}//while
-
 		return false;
 	}//patternMatch
 
 	int hashFunction(int * pattern)
 	{
-		unsigned int index = 0;
-		if (patternLength < 5)
-		{	
-			for (int i=0; i<patternLength; i++)
-				index += pow(pattern[i], (i+1));
-		}//if
-		else
+		//we found this on the internet - crc hash	
+		unsigned int h = 0;
+		unsigned int highorder;
+		for (int i=0; i<patternLength; i++)
 		{
-			for (int i=0; i<5; i++)
-				index += pow(pattern[i], (i+1));
-			for (int i=5; i<patternLength; i++)
-				index += pattern[i] * (i+1);
-		}//else
-		return (index%tableSize);
+			unsigned int patternIndex = pattern[i];
+			highorder = h & 0xf8000000;
+			h = h << 5;
+			h = h ^ (highorder >> 27);
+			h = h ^ patternIndex;
+		}//for	
+		return (h%tableSize);
 	}//hashFunction
 
 	void insert(int * pattern, int c, int fIndex)
@@ -183,7 +180,7 @@ int * numcount(int * x, int n, int m)
 	if (me != 0) //first node has no node before it
 		MPI_Recv(&recvSize, 1, MPI_INT, me-1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-	//creat hash table of size chunkSize plus previous nodes size
+	//create hash table of size chunkSize plus previous nodes size
 	Hash nodeTable(chunkSize+recvSize, m);	
 
 	//count patterns
@@ -198,42 +195,41 @@ int * numcount(int * x, int n, int m)
 	//receive patterns from previous node
 	if (me != 0)
 	{
-		int recvData[recvSize*2]; //contains foundIndex and count
-		int patternIndex = 0;
-		MPI_Recv(&recvData, recvSize*2, MPI_INT, me-1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-
-		for (int i=0; i<recvSize*2; i+=2)
+		int recvData[2]; //contains foundIndex and count
+		for (int i=0; i<recvSize; i++)
 		{
-			for (int j=recvData[i]; j<recvData[i]+m; j++)
-				pattern[patternIndex++] = x[j];
-			patternIndex = 0;
-			nodeTable.insert(pattern, recvData[i+1], recvData[i]); //insert takes pattern, count, and index found
+			MPI_Recv(&recvData, 2, MPI_INT, me-1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			
+			for (int j=0; j<m; j++)
+				pattern[j] = x[recvData[0]+j];
+	
+			nodeTable.insert(pattern, recvData[1], recvData[0]); //insert takes pattern, count, and index found
 		}//for
 	}//if
 	
+	//only worker nodes send to next node
 	if (me != nnodes-1)
 	{
 		//send size to next node
 		int sendSize = nodeTable.getNumPatterns();
 		MPI_Send(&sendSize, 1, MPI_INT, me+1, PIPE_MSG, MPI_COMM_WORLD);
-	
-		//send patterns to next node	
-		int sendArray[nodeTable.getNumPatterns()*2];
-		int sendArrayIndex = 0;	
-		for(int i=0; i<chunkSize+recvSize; i++)
-		{
+
+		//send patterns to next node
+		int sendData[2]; //contains foundIndex and count
+		for (int i=0; i<chunkSize+recvSize; i++)
+		{	
 			if (nodeTable.getHashTable()[i]->count != 0)		
 			{
 				entry * ptr = nodeTable.getHashTable()[i];
 				for (int j=0; j<nodeTable.getItemCount()[i]; j++)
 				{
-					sendArray[sendArrayIndex++] = ptr->foundIndex;
-					sendArray[sendArrayIndex++] = ptr->count;
+					sendData[0] = ptr->foundIndex;
+					sendData[1] = ptr->count;
+					MPI_Send(&sendData, 2, MPI_INT, me+1, PIPE_MSG, MPI_COMM_WORLD);
 					ptr = ptr->next;
 				}//for
 			}//if
-		}//for	
-		MPI_Send(&sendArray, nodeTable.getNumPatterns()*2, MPI_INT, me+1, PIPE_MSG, MPI_COMM_WORLD);
+		}//for
 	}//if
 
 	//output array
@@ -275,11 +271,11 @@ int main(int argc, char *argv[])
 		myFile >> x[i];
 	
 	int * output = numcount(x, n, m);	
-	if (output)
-	{	
-		for (int i=0; i<output[0]*(m+1) + 1; i++)
-			cout << output[i] << " ";
- 		cout << endl;
-	}//if
+//	if (output)
+//	{	
+//		for (int i=0; i<output[0]*(m+1) + 1; i++)
+//			cout << output[i] << " ";
+// 		cout << endl;
+//	}//if
 	delete [] x;
 }//main	
