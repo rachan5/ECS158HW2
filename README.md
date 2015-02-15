@@ -23,6 +23,7 @@ Also we are currently sending just ints, which probably slows things down a ton.
 
 	R CMD SHLIB Problem2.cpp
 	<Then in R>
+	source("Problem2.R")
 	dyn.load("Problem2.so")
 	rmandel(8,-1,1,-1,1,0.01,100,"static",100)
 	
