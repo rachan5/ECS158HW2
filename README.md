@@ -19,7 +19,14 @@ Also we are currently sending just ints, which probably slows things down a ton.
 
 ##Problem 2
 
-***Ray's current idea is to mirror what Matloff's doing in Quiz 2'R mandelbrot function and use OpenMP instead of RSnow***
+***TO COMPILE: CD INTO THE PROBLEM2 DIRECTORY and type the following***
+
+	R CMD SHLIB Problem2.cpp
+	<Then in R>
+	source("Problem2.R")
+	dyn.load("Problem2.so")
+	rmandel(8,-1,1,-1,1,0.01,100,"static",100)
+	
 
 ### **Scheduling clauses** [(copied from wiki)](http://en.wikipedia.org/wiki/OpenMP#Scheduling_clauses)
 
