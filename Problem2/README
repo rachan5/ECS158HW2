@@ -1,0 +1,311 @@
+
+The following tests were done with 
+the following funtion call
+rmandel(8,-1,1,-1,1,0.001,100,"static",p))
+with "p" being the parameters being modified for the tests
+in the above example, p is varying over chunksize.
+
+The mandelopt function was chosen to have 
+sched = "guided" and
+chunksize = 300
+because those paramters performed the best,
+according the tests below.
+
+
+
+=====  chunksizs:  10  =====
+static
+   user  system elapsed 
+  3.363   0.035   3.419 
+dynamic
+   user  system elapsed 
+  3.378   0.041   3.556 
+guided
+   user  system elapsed 
+  3.375   0.056   3.442 
+=====  chunksizs:  50  =====
+static
+   user  system elapsed 
+  3.447   0.046   3.502 
+dynamic
+   user  system elapsed 
+  3.394   0.047   3.497 
+guided
+   user  system elapsed 
+  3.380   0.041   3.431 
+=====  chunksizs:  100  =====
+static
+   user  system elapsed 
+  3.393   0.033   3.436 
+dynamic
+   user  system elapsed 
+  3.337   0.051   3.398 
+guided
+   user  system elapsed 
+  3.325   0.038   3.372 
+=====  chunksizs:  200  =====
+static
+   user  system elapsed 
+  3.352   0.043   3.406 
+dynamic
+   user  system elapsed 
+  3.389   0.034   3.434 
+guided
+   user  system elapsed 
+  3.380   0.044   3.434 
+=====  chunksizs:  300  =====
+static
+   user  system elapsed 
+  3.936   0.053   4.005 
+dynamic
+   user  system elapsed 
+  3.367   0.047   3.425 
+guided
+   user  system elapsed 
+  3.316   0.040   3.366 
+=====  chunksizs:  400  =====
+static
+   user  system elapsed 
+  3.321   0.042   3.373 
+dynamic
+   user  system elapsed 
+  3.362   0.050   3.423 
+guided
+   user  system elapsed 
+  3.360   0.053   3.424 
+=====  chunksizs:  500  =====
+static
+   user  system elapsed 
+  3.325   0.047   3.382 
+dynamic
+   user  system elapsed 
+  3.369   0.046   3.426 
+guided
+   user  system elapsed 
+  3.337   0.040   3.387 
+=====  chunksizs:  800  =====
+static
+   user  system elapsed 
+  3.363   0.050   3.423 
+dynamic
+   user  system elapsed 
+  3.346   0.054   3.410 
+guided
+   user  system elapsed 
+  3.366   0.049   3.426 
+=====  chunksizs:  1000  =====
+static
+   user  system elapsed 
+  3.384   0.035   3.434 
+dynamic
+   user  system elapsed 
+  3.332   0.051   3.393 
+guided
+   user  system elapsed 
+  3.354   0.043   3.411 
+
+@@@@@@@@@@@@@@@@@       @@@@@@@@@@@@@@@@@
+
+=====  iterations:  10  =====
+static
+   user  system elapsed 
+  2.612   0.041   2.661 
+dynamic
+   user  system elapsed 
+  2.612   0.039   2.664 
+guided
+   user  system elapsed 
+  2.621   0.050   2.679 
+=====  iterations:  50  =====
+static
+   user  system elapsed 
+  2.943   0.053   3.006 
+dynamic
+   user  system elapsed 
+  2.967   0.047   3.024 
+guided
+   user  system elapsed 
+  2.948   0.047   3.006 
+=====  iterations:  100  =====
+static
+   user  system elapsed 
+  3.387   0.049   3.446 
+dynamic
+   user  system elapsed 
+  3.333   0.052   3.395 
+guided
+   user  system elapsed 
+  3.342   0.037   3.389 
+=====  iterations:  200  =====
+static
+   user  system elapsed 
+  4.164   0.051   4.226 
+dynamic
+   user  system elapsed 
+  4.217   0.046   4.274 
+guided
+   user  system elapsed 
+  4.159   0.043   4.212 
+=====  iterations:  300  =====
+static
+   user  system elapsed 
+  4.948   0.043   5.000 
+dynamic
+   user  system elapsed 
+  4.956   0.043   5.010 
+guided
+   user  system elapsed 
+  4.900   0.041   4.952 
+=====  iterations:  400  =====
+static
+   user  system elapsed 
+  5.750   0.043   5.803 
+dynamic
+   user  system elapsed 
+  5.738   0.037   5.788 
+guided
+   user  system elapsed 
+  5.708   0.050   5.768 
+=====  iterations:  500  =====
+static
+   user  system elapsed 
+  6.526   0.047   6.584 
+dynamic
+   user  system elapsed 
+  6.480   0.051   6.544 
+guided
+   user  system elapsed 
+  6.476   0.043   6.531 
+=====  iterations:  800  =====
+static
+   user  system elapsed 
+  8.927   0.046   8.986 
+dynamic
+   user  system elapsed 
+  8.838   0.036   8.889 
+guided
+   user  system elapsed 
+  8.883   0.039   8.936 
+=====  iterations:  1000  =====
+static
+   user  system elapsed 
+ 10.504   0.044  10.564 
+dynamic
+   user  system elapsed 
+ 10.451   0.051  10.517 
+guided
+   user  system elapsed 
+ 10.495   0.046  10.555 
+
+@@@@@@@@@@@@@@@@@       @@@@@@@@@@@@@@@@@
+
+=====  threads:  1  =====
+static
+   user  system elapsed 
+  3.314   0.048   3.374 
+dynamic
+   user  system elapsed 
+  3.343   0.044   3.396 
+guided
+   user  system elapsed 
+  3.314   0.040   3.365 
+=====  threads:  2  =====
+static
+   user  system elapsed 
+  3.393   0.043   3.446 
+dynamic
+   user  system elapsed 
+  3.368   0.040   3.419 
+guided
+   user  system elapsed 
+  3.423   0.043   3.476 
+=====  threads:  3  =====
+static
+   user  system elapsed 
+  3.383   0.043   3.435 
+dynamic
+   user  system elapsed 
+  3.338   0.045   3.393 
+guided
+   user  system elapsed 
+  3.348   0.046   3.404 
+=====  threads:  4  =====
+static
+   user  system elapsed 
+  3.371   0.049   3.430 
+dynamic
+   user  system elapsed 
+  3.373   0.041   3.424 
+guided
+   user  system elapsed 
+  3.441   0.040   3.494 
+=====  threads:  5  =====
+static
+   user  system elapsed 
+  3.340   0.049   3.399 
+dynamic
+   user  system elapsed 
+  3.362   0.041   3.413 
+guided
+   user  system elapsed 
+  3.364   0.054   3.430 
+=====  threads:  6  =====
+static
+   user  system elapsed 
+  3.363   0.051   3.424 
+dynamic
+   user  system elapsed 
+  3.334   0.067   3.412 
+guided
+   user  system elapsed 
+  3.367   0.047   3.425 
+=====  threads:  7  =====
+static
+   user  system elapsed 
+  3.373   0.045   3.428 
+dynamic
+   user  system elapsed 
+  3.369   0.052   3.432 
+guided
+   user  system elapsed 
+  3.332   0.046   3.388 
+=====  threads:  8  =====
+static
+   user  system elapsed 
+  3.343   0.046   3.399 
+dynamic
+   user  system elapsed 
+  3.354   0.040   3.403 
+guided
+   user  system elapsed 
+  3.365   0.050   3.426 
+=====  threads:  16  =====
+static
+   user  system elapsed 
+  3.331   0.048   3.388 
+dynamic
+   user  system elapsed 
+  3.297   0.051   3.357 
+guided
+   user  system elapsed 
+  3.316   0.047   3.373 
+=====  threads:  32  =====
+static
+   user  system elapsed 
+  3.390   0.037   3.437 
+dynamic
+   user  system elapsed 
+  3.396   0.040   3.446 
+guided
+   user  system elapsed 
+  3.362   0.050   3.425 
+=====  threads:  50  =====
+static
+   user  system elapsed 
+  3.362   0.052   3.424 
+dynamic
+   user  system elapsed 
+  3.370   0.049   3.430 
+guided
+   user  system elapsed 
+  3.566   0.040   3.616 
