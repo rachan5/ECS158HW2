@@ -1,4 +1,17 @@
 
+To compile:
+
+"R CMD SHLIB Problem2.cpp"
+
+then in R:
+
+"
+>dyn.load("Problem2.so")
+>source("Probem2.R")
+>rmandel(....)
+"
+
+
 The following tests were done with 
 the following funtion call
 rmandel(8,-1,1,-1,1,0.001,100,"static",p))
