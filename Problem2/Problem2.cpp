@@ -1,16 +1,6 @@
 //Authors: Group 5 Raymond S. Chan, Alicia Luu, Bryan Ng
 
 //Comments are from Quiz2's mandelbrot
-//
-//
-//
-//
-//
-//
-//
-//
-//return answer
-//
 
 #include <iostream>
 #include <complex>
@@ -163,6 +153,29 @@ extern "C" SEXP cmandel(SEXP Rnth, SEXP Rxl, SEXP Rxr, SEXP Ryb, SEXP Ryt, SEXP 
       //return m;
       break;
       }
+    case 4:
+      for(int i = 0; i < numXticks; i++){
+        xti = xticks[i];
+        for (int j = 0; j < numYticks; j++){
+          ytj = yticks[j];
+          cpt = std::complex<double>(xti,ytj);
+          z = std::complex<double>(cpt);
+          for (int k = 0; k <= maxiters; k++){
+            z = (z*z) + cpt;
+            if(sqrt((z.real()*z.real()+z.imag()*z.imag())) > 2.0){
+              break;
+            }
+            if(k == maxiters){
+              //*(m+(i*numXticks)+j) = 1;
+              INTEGER(Rval)[(i*numXticks)+j] = 1;
+            }
+          }// end for k, maxiters
+        }//end for j, numYticks
+      }//end for i, numXticks
+      UNPROTECT(1);
+      return Rval;
+      //return m;
+      break;
     default:
       std::cout << "error in sched" << std::endl;
   }

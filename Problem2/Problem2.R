@@ -26,15 +26,18 @@ rmandel_t <- function(nth,xl,xr,yb,yt,inc,maxiters,sched,chunksize){
   else if (sched == "guided"){
     sched_num <- 3
   }
+  else if (sched == "serial"){
+    sched_num <- 4
+  }
   else{
     print("ERROR: sched != static, dynamic or guided, please try again.\n")
   }
   z <- .Call("cmandel", nth, xl, xr, yb, yt, inc, maxiters, sched_num, chunksize)
   
   g <- list()
-  g$x <- seq(xl,xr,inc)
   g$y <- seq(yb,yt,inc)
-  g$z <- matrix(z,nrow = abs(xl-xr)/inc, ncol = abs(yb-yt)/inc)
+  g$x <- seq(xl,xr,inc)
+  g$z <- t(matrix(z,nrow = abs(yb-yt)/inc, ncol = abs(xl-xr)/inc))
   #print the image to .png
   png("HW2P2Mandelplot.png")
   image(g)
@@ -45,5 +48,9 @@ rmandel_t <- function(nth,xl,xr,yb,yt,inc,maxiters,sched,chunksize){
 
 rmandel <- function(nth,xl,xr,yb,yt,inc,maxiters,sched,chunksize){
   system.time(rmandel_t(nth,xl,xr,yb,yt,inc,maxiters,sched,chunksize))
+}
+
+mandelopt <- function(nth,xl,xr,yb,yt,inc,maxiters){
+  system.time(rmandel_t(nth,xl,xr,yb,yt,inc,maxiters,"guided",300))
 }
 
