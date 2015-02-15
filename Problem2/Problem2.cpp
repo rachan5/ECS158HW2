@@ -21,14 +21,16 @@
 #include <R.h>
 #include <Rinternals.h>
 #include <Rmath.h>
-extern "C" SEXP Problem2(SEXP Rnth, SEXP Rxl, SEXP Rxr, SEXP Ryb, SEXP Ryt, SEXP Rinc, SEXP Rmaxiters, SEXP Rsched, SEXP Rchunksize){
+#include "omp.h"
+
+extern "C" SEXP cmandel(SEXP Rnth, SEXP Rxl, SEXP Rxr, SEXP Ryb, SEXP Ryt, SEXP Rinc, SEXP Rmaxiters, SEXP Rsched, SEXP Rchunksize){
 //int* cmandel(int nth, double xl, double xr, double yb, double yt, double inc, int maxiters, std::string sched, int chunksize){
   //determine where the tick marks go on the X and Y axes
   //possibly unneed functions here...
   SEXP Rval;
-  double nth, xl, xr, yb, yt, inc; 
-  int maxiters, chunksize;
-  Rnth = coerceVector(Rnth,REALSXP);
+  double xl, xr, yb, yt, inc; 
+  int nth, sched, maxiters, chunksize;
+  Rnth = coerceVector(Rnth,INTSXP);
   Rxl = coerceVector(Rxl,REALSXP);
   Rxr = coerceVector(Rxr,REALSXP);
   Ryb = coerceVector(Ryb,REALSXP);
@@ -36,13 +38,14 @@ extern "C" SEXP Problem2(SEXP Rnth, SEXP Rxl, SEXP Rxr, SEXP Ryb, SEXP Ryt, SEXP
   Rinc = coerceVector(Rinc,REALSXP);
   Rmaxiters = coerceVector(Rmaxiters,INTSXP);
   Rchunksize = coerceVector(Rchunksize,INTSXP);
-  //std::string sched??? //HOW TO INITALIZE???
-  nth = REAL(Rnth)[0];
+  Rsched = coerceVector(Rsched,INTSXP);
+  nth = INTEGER(Rnth)[0];
   xl = REAL(Rxl)[0];
   xr = REAL(Rxr)[0];
   yb = REAL(Ryb)[0];
   yt = REAL(Ryt)[0];
   inc = REAL(Rinc)[0];
+  sched = INTEGER(Rsched)[0];
   maxiters = INTEGER(Rmaxiters)[0];
   chunksize = INTEGER(Rchunksize)[0];
   
@@ -51,32 +54,24 @@ extern "C" SEXP Problem2(SEXP Rnth, SEXP Rxl, SEXP Rxr, SEXP Ryb, SEXP Ryt, SEXP
   double xticks[numXticks];
   double yticks[numYticks];
   
-  for (int i = 0; i <= numXticks; i++)
-  {
+  //intialize Xticks and Ytick arrays return value matrix 
+  for (int i = 0; i <= numXticks; i++){
     xticks[i] = xl +(inc*(double)i);
-    //std::cout << xticks[i] << " ";
-  }
+  }//for i
   
-  for (int i = 0; i <= numYticks; i++)
-  {
+  for (int i = 0; i <= numYticks; i++){
     yticks[i] = yb +(inc*(double)i);
-    //std::cout << yticks[i] << " ";
-  }
-  //std::cout << std::endl;
+  }//for i
 
-  //intialize return value matrix
-  //is using a 1-D array faster?
-  int * m = (int *) malloc(sizeof(int)*numXticks*numYticks);
+  //int * m = (int *) malloc(sizeof(int)*numXticks*numYticks);
   PROTECT(Rval = allocVector(INTSXP,(numXticks)*(numYticks)));
 
-  //std::cout << "==========================" << std::endl;
   for (int i = 0; i < numXticks; i++){
     for (int j = 0; j < numYticks; j++){
-      *(m+(numXticks*i)+j) = 0;
+      //*(m+(numXticks*i)+j) = 0;
       INTEGER(Rval)[(i*numXticks)+j] = 0;
-    }
-  }
-  //std::cout << "==========================" << std::endl;
+    }//for i
+  }//for j
 
   //iteratate through the entire grid, 
   //setting c to each gtrid point and then
@@ -84,30 +79,99 @@ extern "C" SEXP Problem2(SEXP Rnth, SEXP Rxl, SEXP Rxr, SEXP Ryb, SEXP Ryt, SEXP
   double xti, ytj;
   std::complex<double> cpt;
   std::complex<double> z;
-  for (int i = 0; i < numXticks; i++){
-    xti = xticks[i];
-    for (int j = 0; j < numYticks; j++){
-      ytj = yticks[j];
-      cpt = std::complex<double>(xti,ytj);
-      z = std::complex<double>(cpt);
-      for (int k = 0; k <= maxiters; k++){
-        z = (z*z) + cpt;
-        //std::cout << sqrt((z.real()*z.real()+z.imag()*z.imag())) << std::endl;
-        if(sqrt((z.real()*z.real()+z.imag()*z.imag())) > 2.0){
-          break;
-        }
-        if(k == maxiters){
-          //std::cout << "you made it here" << std::endl;
-          *(m+(i*numXticks)+j) = 1;
-          INTEGER(Rval)[(i*numXticks)+j] = 1;
-        }
-      }// end for k, maxiters
-    }//end for j, numYticks
-  }//end for i, numXticks
-  UNPROTECT(1);
-  return Rval;
-  //return m;
-}
+  
+  //SWITCH STATEMENT SHOULD GO HERE!!!!!!!!!!!!!!!!!! 
+  switch(sched){
+    case 1:
+      #pragma omp parallel num_threads(nth)
+      {
+      #pragma omp for schedule(static,chunksize)
+      for(int i = 0; i < numXticks; i++){
+        xti = xticks[i];
+        for (int j = 0; j < numYticks; j++){
+          ytj = yticks[j];
+          cpt = std::complex<double>(xti,ytj);
+          z = std::complex<double>(cpt);
+          for (int k = 0; k <= maxiters; k++){
+            z = (z*z) + cpt;
+            if(sqrt((z.real()*z.real()+z.imag()*z.imag())) > 2.0){
+              break;
+            }
+            if(k == maxiters){
+              //*(m+(i*numXticks)+j) = 1;
+              INTEGER(Rval)[(i*numXticks)+j] = 1;
+            }
+          }// end for k, maxiters
+        }//end for j, numYticks
+      }//end for i, numXticks
+      UNPROTECT(1);
+      return Rval;
+      //return m;
+      break;
+      }
+    case 2:
+      #pragma omp parallel num_threads(nth)
+      {
+      #pragma omp for schedule(dynamic,chunksize)
+      for(int i = 0; i < numXticks; i++){
+        xti = xticks[i];
+        for (int j = 0; j < numYticks; j++){
+          ytj = yticks[j];
+          cpt = std::complex<double>(xti,ytj);
+          z = std::complex<double>(cpt);
+          for (int k = 0; k <= maxiters; k++){
+            z = (z*z) + cpt;
+            if(sqrt((z.real()*z.real()+z.imag()*z.imag())) > 2.0){
+              break;
+            }
+            if(k == maxiters){
+              //*(m+(i*numXticks)+j) = 1;
+              INTEGER(Rval)[(i*numXticks)+j] = 1;
+            }
+          }// end for k, maxiters
+        }//end for j, numYticks
+      }//end for i, numXticks
+      UNPROTECT(1);
+      return Rval;
+      //return m;
+      break;
+      }
+    case 3:
+      #pragma omp parallel num_threads(nth)
+      {
+      #pragma omp for schedule(guided, chunksize)
+      for(int i = 0; i < numXticks; i++){
+        xti = xticks[i];
+        for (int j = 0; j < numYticks; j++){
+          ytj = yticks[j];
+          cpt = std::complex<double>(xti,ytj);
+          z = std::complex<double>(cpt);
+          for (int k = 0; k <= maxiters; k++){
+            z = (z*z) + cpt;
+            if(sqrt((z.real()*z.real()+z.imag()*z.imag())) > 2.0){
+              break;
+            }
+            if(k == maxiters){
+              //*(m+(i*numXticks)+j) = 1;
+              INTEGER(Rval)[(i*numXticks)+j] = 1;
+            }
+          }// end for k, maxiters
+        }//end for j, numYticks
+      }//end for i, numXticks
+      UNPROTECT(1);
+      return Rval;
+      //return m;
+      break;
+      }
+    default:
+      std::cout << "error in sched" << std::endl;
+  }
+  return 0;
+}//end cmandel()
+
+
+
+//=============================================================================
 /*
 int main(){
   //operators for complex type:  =, +=, -=, *=, /=, +, -, *, /, ==, !=, <<, >>
