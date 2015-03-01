@@ -15,7 +15,7 @@ void merge(entry * a, int low, int high)
 	int j = low;
 	int k = pivot+1;
 
-	entry temp[high-low+1];
+	entry * temp = new entry[high-low+1];
 
 	while ((j <= pivot) && (k <= high))
 	{
@@ -33,6 +33,8 @@ void merge(entry * a, int low, int high)
 
 	for (int h=low; h<= high; h++)
 		a[h] = temp[h-low];
+	
+	delete [] temp;
 }//merge
 
 void mergeSort(entry * a, int low, int high)
@@ -50,7 +52,7 @@ void mergeSort(entry * a, int low, int high)
 
 void smoothc(float * x, float * y, float * m, int n, float h)
 {
-	entry array[n];
+	entry * array = new entry[n];
 	for (int i=0; i<n; i++)
 	{
 		entry temp;
@@ -62,18 +64,16 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 	
 	mergeSort(array, 0, n-1);
 
-	for (int i=0; i<n; i++)
-	{
-	}//for
+	delete [] array;
 }//smoothc
 
 
 int main()
 {
-	int n = 1000;
-	float x[n];
-	float y[n];
-	float m[n];
+	int n = 2000000;
+	float * x = new float[n];
+	float * y = new float[n];
+	float * m = new float[n];
 	float h = 2;
 	
 	for (int i=0; i<n; i++)
@@ -83,4 +83,7 @@ int main()
 	}//for
 
 	smoothc(x, y, m, n, h);
+	delete [] x;
+	delete [] y;
+	delete [] m;
 }//main
