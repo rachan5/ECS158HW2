@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
+#include <time.h>
 
 struct entry
 {
@@ -152,25 +153,27 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 
 int main()
 {
-	//int n = 2000000;
-	//float * x = new float[n];
-	//float * y = new float[n];
-	//float * m = new float[n];
-	//float h = 2;
+	int a, n = 2000000;
+	float * x = new float[n];
+	float * y = new float[n];
+	float * m = new float[n];
+	float h = 2;
 	
-	//for (int i=0; i<n; i++)
-	//{
-	//	x[i] = rand() % 100;
-	//	y[i] = rand() % 100;
-	//}//for
+	a=rand();//range of float [-a, a]
+	srand(time(NULL));//init rand() seed
+	for (int i=0; i<n; i++)
+	{
+		x[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
+		y[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
+	}//generate random floats for x and y
 
-
+/*
 	float x[20] = {1, 1,2,2, 3,3, 4,4, 5,5, 6,6, 7,7, 8,8, 9,9, 10,10};
 	float y[20] = {11,11, 12,12, 13,13, 14,14, 15,15, 16,16, 17,17, 18,18, 19,19, 20,20};
 	float m[20];
 	int n = 20;
 	float h = 2;
-
+*/
 	smoothc(x, y, m, n, h);
 	//delete [] x;
 	//delete [] y;
