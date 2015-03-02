@@ -9,80 +9,58 @@ struct entry
 };//entry
 
 
-__device__ int binarySearch(entry * data, float val, int n, bool bound)
+__device__ int binarySearchLB(entry * data, float val, int n)
 {
-	//return index of xValue that is equal to or closest to value
-	//bound - round up or down, T = round down, F = round up
+	//return index of greatest leftmost xValue that is greater than val
 	int left = 0;
 	int right = n;
-	int mid = (right-left)/2;
+	int mid;
 
-	while(1)
+	while (left != right)
 	{
-		if (data[mid].xValue == val)
-			return mid;
-
-		else if (data[mid].xValue > val)
-		{
-			if (mid == 0)
-				return mid;
-			else if ((data[mid-1].xValue < val) && (!bound))
-				return mid;	
-			else if ((data[mid-1].xValue < val) && (bound))
-				return mid-1;
-
+		mid = (left+right)/2;
+		
+		if (data[mid].xValue <= val)
+			left = mid + 1;
+		else
 			right = mid;
-			mid = (right-left)/2;
-		}//else if
-
-		else if (data[mid].xValue < val)
-		{
-			if (mid == n-1)
-				return mid;
-			else if ((data[mid+1].xValue > val) && (!bound))
-				return mid+1;
-			else if ((data[mid+1].xValue > val) && (bound))
-				return mid;
-
-			left = mid;
-			mid = (right+left)/2;
-		}//else if
 	}//while
-}//binarySearch
+	return left;
+}//binarySearchLB
+
+
+__device__ int binarySearchUB(entry * data, float val, int n)
+{
+	//return index of greatest leftmost xValue that is greater than val
+	int left = 0;
+	int right = n;
+	int mid;
+
+	while (left != right)
+	{
+		mid = (left+right)/2;
+		
+		if (data[mid].xValue >= val)
+			right = mid;
+		else
+			left = mid + 1;
+	}//while
+
+	return left;
+}//binarySearchLB
 
 
 __global__ void kernel(entry * array, int n, float h)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x; 
-	int lowerBound = binarySearch(array, array[idx].xValue-h, n, 0); //T-round down, F-round up
-	int upperBound = binarySearch(array, array[idx].xValue+h, n, 1);
-
-	//check for duplicates
-	if (lowerBound != 0)
-	{
-		while (array[lowerBound-1].xValue == array[lowerBound].xValue)
-		{
-			lowerBound--;
-			if (lowerBound == 0)
-				break;
-		}//while
-	}//if
-
-	if (upperBound != n-1)
-	{
-		while (array[upperBound+1].xValue == array[upperBound].xValue)
-		{
-			upperBound++;
-			if (upperBound == n-1)
-				break;
-		}//while
-	}//if
+	int lowerBound = binarySearchLB(array, array[idx].xValue-h, n);
+	int upperBound = binarySearchUB(array, array[idx].xValue+h, n);
 
 	float avg = 0;
 	//calculate y average
-	for (int i=lowerBound; i<upperBound+1; i++)
+	for (int i=lowerBound; i<upperBound; i++)
 		avg += array[i].yValue;
-	avg = avg/((float) (upperBound-lowerBound+1));
+	avg = avg/((float) (upperBound-lowerBound));
 
 	array[idx].yValue = avg;	
 }//kernel
@@ -162,9 +140,10 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 	
 	//rearrange array in original order
 	for (int i=0; i<n; i++)
-	{
 		m[array[i].origIndex] = array[i].yValue;
-	}//for
+
+	for (int i=0; i<n; i++)
+		printf("%f\n", m[i]);
 
 	cudaFree(deviceArray);
 	delete [] array;
@@ -173,20 +152,27 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 
 int main()
 {
-	int n = 2000000;
-	float * x = new float[n];
-	float * y = new float[n];
-	float * m = new float[n];
-	float h = 2;
+	//int n = 2000000;
+	//float * x = new float[n];
+	//float * y = new float[n];
+	//float * m = new float[n];
+	//float h = 2;
 	
-	for (int i=0; i<n; i++)
-	{
-		x[i] = rand() % 100;
-		y[i] = rand() % 100;
-	}//for
+	//for (int i=0; i<n; i++)
+	//{
+	//	x[i] = rand() % 100;
+	//	y[i] = rand() % 100;
+	//}//for
+
+
+	float x[20] = {1, 1,2,2, 3,3, 4,4, 5,5, 6,6, 7,7, 8,8, 9,9, 10,10};
+	float y[20] = {11,11, 12,12, 13,13, 14,14, 15,15, 16,16, 17,17, 18,18, 19,19, 20,20};
+	float m[20];
+	int n = 20;
+	float h = 2;
 
 	smoothc(x, y, m, n, h);
-	delete [] x;
-	delete [] y;
-	delete [] m;
+	//delete [] x;
+	//delete [] y;
+	//delete [] m;
 }//main
