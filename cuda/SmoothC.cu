@@ -3,6 +3,8 @@
 #include <cuda.h>
 #include <time.h>
 
+// to compile: /usr/local/cuda-5.5/bin/nvcc SmoothC.cu 
+
 struct entry
 {
 	int origIndex;
@@ -32,7 +34,7 @@ __device__ int binarySearchLB(entry * data, float val, int n)
 
 __device__ int binarySearchUB(entry * data, float val, int n)
 {
-	//return index of greatest leftmost xValue that is greater than val
+	//return index of greatest leftmost (RIGHTMOST?) xValue that is greater than val
 	int left = 0;
 	int right = n;
 	int mid;
@@ -153,7 +155,8 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 
 int main()
 {
-	int a, n = 2000000;
+	/*
+  int a, n = 2000000;
 	float * x = new float[n];
 	float * y = new float[n];
 	float * m = new float[n];
@@ -166,14 +169,14 @@ int main()
 		x[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
 		y[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
 	}//generate random floats for x and y
+*/
 
-/*
 	float x[20] = {1, 1,2,2, 3,3, 4,4, 5,5, 6,6, 7,7, 8,8, 9,9, 10,10};
 	float y[20] = {11,11, 12,12, 13,13, 14,14, 15,15, 16,16, 17,17, 18,18, 19,19, 20,20};
 	float m[20];
 	int n = 20;
 	float h = 2;
-*/
+
 	smoothc(x, y, m, n, h);
 	//delete [] x;
 	//delete [] y;
