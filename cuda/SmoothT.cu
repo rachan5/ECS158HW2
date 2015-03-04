@@ -48,13 +48,17 @@ void smootht(float *x, float *y, float *m, int n, float h)
     //std::cout << total << " " << count << " " << total/count << std::endl;
   }//end for i 
   //copy and print
-  thrust::copy(dm.begin(), dm.end(), std::ostream_iterator<float>(std::cout, "\n"));
-  
+  //thrust::copy(dm.begin(), dm.end(), std::ostream_iterator<float>(std::cout, "\n"));
+  for(int i = 0; i < dm.size(); i++)
+  {
+    m[i] = *(dm.begin()+i);
+    //std::cout << m[i] << std::endl;
+  }
 }//smootht
 
 
-int main()
-{	
+//int main()
+//{	
   /*
   int a, n = 2000000; //took away 0 zeros
 	//2000000 takes 11 minutes plus!
@@ -72,12 +76,13 @@ int main()
 		y[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
 	}//generate random floats for x and y
 	*/
-  
+  /*
   float x[20] = {1, 1,2,2, 3,3, 4,4, 5,5, 6,6, 7,7, 8,8, 9,9, 10,10};
 	float y[20] = {11,11, 12,12, 13,13, 14,14, 15,15, 16,16, 17,17, 18,18, 19,19, 20,20};
 	float m[20];
 	int n = 20;
 	float h = 2;
-  
-	smootht(x, y, m, n, h);
-}//main
+  */
+	//smootht(x, y, m, n, h);
+//}//main
+
