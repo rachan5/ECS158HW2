@@ -16,19 +16,19 @@ struct smoother_functor
 {
   const float h;
   const float x_i;
-  smoother_functor(float _h, float _x_i): h(_h), x_i(_x_i){}
+  smoother_functor(float _h, float _x_i): h(_h), x_i(_x_i){}//constructor
   __host__ __device__
   float operator()(const float&x, const float& y)const //FILL IN FROM TUTORIAL
   {
-    return (fabs(x-x_i) < (float)h) ? 1.0 : 0.0;
+    return (fabs(x-x_i) < (float)h) ? 1.0 : 0.0;//1=avg, 0= dont avg val
   }
 }; //struct smoother_functor
 
 void smootht(float *x, float *y, float *m, int n, float h)
 {
-  thrust::device_vector<float> dx(x,x+n);
+  thrust::device_vector<float> dx(x,x+n); //x=pointer to x array, x+n end of array
   thrust::device_vector<float> dy(y,y+n);
-  thrust::device_vector<float> dm(n,0.0);
+  thrust::device_vector<float> dm(n,0.0);//create a vector of length n, init all to zero
   thrust::device_vector<float> dtemp(n,0.0);
   thrust::device_vector<float> dtemp2(n,0.0);
   
@@ -38,6 +38,8 @@ void smootht(float *x, float *y, float *m, int n, float h)
     float total = 0.0;
     int count = 0;
     thrust::transform(dx.begin(),dx.end(), dy.begin(), dtemp.begin(),smoother_functor(h,*(dx.begin()+i)));
+    //takes dx vector array and dy array, manipulate dx and stores to dtepm 4, smoother_func in line 19
+    
     //std::cout << "CHECK AVERAGING" << std::endl;
    
     //calculate averages
