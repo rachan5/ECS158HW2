@@ -52,7 +52,7 @@ int h_binarySearchUB(entry * data, float val, int n)
 }//binarySearchUB
 
 
-__device__ int binarySearchLB(entry * data, float val, int n)
+__device__ int binarySearchLB(entry * data, float val, int n)//val is x val +/- tuning parameter
 {
 	//return index of greatest leftmost xValue that is greater than val
 	int left = 0;
@@ -96,8 +96,8 @@ __device__ int binarySearchUB(entry * data, float val, int n)
 __global__ void kernel1(entry * array, int n, float h)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x; 
-	int lowerBound = binarySearchLB(array, array[idx].xValue-h, n);
-	int upperBound = binarySearchUB(array, array[idx].xValue+h, n);
+	int lowerBound = binarySearchLB(array, array[idx].xValue-h, n);//binsearchlb device func
+	int upperBound = binarySearchUB(array, array[idx].xValue+h, n);//ub is device func
 
 	float avg = 0;
 	//calculate y average
@@ -168,8 +168,8 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 {
 	entry * array = new entry[n];
 	entry * deviceArray;
-	int * countArray = new int[n];
-	int blockSize = 1024;
+	int * countArray = new int[n];// should not be there, mem leak
+	int blockSize = 1024;//num thread per block 
 
 	//creat array of structs	
 	for (int i=0; i<n; i++)
@@ -184,8 +184,9 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 	//sort by xValue
 	mergeSort(array, 0, n-1);
 
-	if (n < GIGABYTE/sizeof(entry))
+	if (n < GIGABYTE/sizeof(entry))// if fits into 1 gig of mem hard code in line 5
 	{
+		//put array onto device array
 		cudaMalloc(&deviceArray, sizeof(entry) * n);
 		cudaMemcpy(deviceArray, array, sizeof(entry) * n, cudaMemcpyHostToDevice);
 
@@ -193,7 +194,7 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 		dim3 dimGrid(ceil(n/blockSize));
 
 		//stores smoothed average in yValue
-		kernel1 <<< dimGrid, dimBlock >>> (deviceArray, n, h);
+		kernel1 <<< dimGrid, dimBlock >>> (deviceArray, n, h);//send to line 96
 		cudaMemcpy(array, deviceArray, sizeof(entry) * n, cudaMemcpyDeviceToHost);
 		
 	//rearrange array in original order
@@ -219,7 +220,7 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 			kernel2 <<< 1, 1 >>> (deviceArray, ub-lb);
 			cudaMemcpy(chunkArray, deviceArray, sizeof(entry) * (ub-lb), cudaMemcpyDeviceToHost);
 
-			m[array[i].origIndex] = chunkArray[0].yValue;
+			m[array[i].origIndex] = chunkArray[0].yValue;//store y avg
 			cudaFree(deviceArray);
 			delete [] chunkArray;
 		}//for
