@@ -21,6 +21,8 @@ phylocase/src contain the C/C++ source code (take a look at ancestors.c)
 * Figure out how to *assemble code in a formal R package, that is, it must build on CSIF using "R CMD INSTALL" command*.
 
 * Find a LARGE test cases for time comparison between the different implementations.
+	* Generate Newick tree format data file (Ray has)
+	* use readNewick() function from phylobase package
 
 * Start documenting references used 
 
@@ -55,3 +57,10 @@ To test your installation (still in R command prompt),run
 	shortestPath(geospiza, "F", "L")
 	## branch length from a tip to the root
 	sumEdgeLength(geospiza, ancestors(geospiza, "fortis", type="ALL"))
+
+
+------
+
+#### References  ####
+
+http://cran.r-project.org/web/packages/phylobase/phylobase.pdf
