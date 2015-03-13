@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
-#include <time.h>
 
-// to compile: /usr/local/cuda-5.5/bin/nvcc SmoothC.cu 
+#define GIGABYTE 1000000000
 
 struct entry
 {
@@ -12,7 +11,48 @@ struct entry
 };//entry
 
 
-__device__ int binarySearchLB(entry * data, float val, int n)
+int h_binarySearchLB(entry * data, float val, int n)
+{
+	//return index of greatest leftmost xValue that is greater than val
+	int left = 0;
+	int right = n;
+	int mid;
+
+	while (left != right)
+	{
+		mid = (left+right)/2;
+		
+		if (data[mid].xValue <= val)
+			left = mid + 1;
+		else
+			right = mid;
+	}//while
+	return left;
+}//binarySearchLB
+
+
+int h_binarySearchUB(entry * data, float val, int n)
+{
+	//return index of greatest leftmost xValue that is greater than val
+	int left = 0;
+	int right = n;
+	int mid;
+
+	while (left != right)
+	{
+		mid = (left+right)/2;
+		
+		if (data[mid].xValue >= val)
+			right = mid;
+		else
+			left = mid + 1;
+	}//while
+
+	return left;
+}//binarySearchUB
+
+
+__device__ int binarySearchLB(entry * data, float val, int n)//val is x val +/- tuning parameter
 {
 	//return index of greatest leftmost xValue that is greater than val
 	int left = 0;
@@ -34,7 +74,7 @@ __device__ int binarySearchLB(entry * data, float val, int n)
 
 __device__ int binarySearchUB(entry * data, float val, int n)
 {
-	//return index of greatest leftmost (RIGHTMOST?) xValue that is greater than val
+	//return index of greatest leftmost xValue that is greater than val
 	int left = 0;
 	int right = n;
 	int mid;
@@ -50,14 +90,14 @@ __device__ int binarySearchUB(entry * data, float val, int n)
 	}//while
 
 	return left;
-}//binarySearchLB
+}//binarySearchUB
 
 
-__global__ void kernel(entry * array, int n, float h)
+__global__ void kernel1(entry * array, int n, float h)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x; 
-	int lowerBound = binarySearchLB(array, array[idx].xValue-h, n);
-	int upperBound = binarySearchUB(array, array[idx].xValue+h, n);
+	int lowerBound = binarySearchLB(array, array[idx].xValue-h, n);//binsearchlb device func
+	int upperBound = binarySearchUB(array, array[idx].xValue+h, n);//ub is device func
 
 	float avg = 0;
 	//calculate y average
@@ -65,8 +105,20 @@ __global__ void kernel(entry * array, int n, float h)
 		avg += array[i].yValue;
 	avg = avg/((float) (upperBound-lowerBound));
 
+	//yValue stores the avg
 	array[idx].yValue = avg;	
-}//kernel
+}//kernel1
+
+
+__global__ void kernel2(entry * array, int n)
+{
+	float avg = 0;
+	for (int i=0; i<n; i++)
+		avg += array[i].yValue;
+	avg = avg / (float) n;
+
+	array[0].yValue = avg;			
+}//kernel2
 
 
 void merge(entry * a, int low, int high)
@@ -98,6 +150,7 @@ void merge(entry * a, int low, int high)
 	delete [] temp;
 }//merge
 
+
 void mergeSort(entry * a, int low, int high)
 {
 	int pivot;
@@ -115,7 +168,8 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 {
 	entry * array = new entry[n];
 	entry * deviceArray;
-	float blockSize = 1024;
+	int * countArray = new int[n];// should not be there, mem leak
+	int blockSize = 1024;//num thread per block 
 
 	//creat array of structs	
 	for (int i=0; i<n; i++)
@@ -126,59 +180,77 @@ void smoothc(float * x, float * y, float * m, int n, float h)
 		temp.yValue = y[i];
 		array[i] = temp;
 	}//for
-	
-	//sort by x values
+
+	//sort by xValue
 	mergeSort(array, 0, n-1);
 
-	cudaMalloc(&deviceArray, sizeof(entry) * n);
-	cudaMemcpy(deviceArray, array, sizeof(entry) * n, cudaMemcpyHostToDevice);
+	if (n < GIGABYTE/sizeof(entry))// if fits into 1 gig of mem hard code in line 5
+	{
+		//put array onto device array
+		cudaMalloc(&deviceArray, sizeof(entry) * n);
+		cudaMemcpy(deviceArray, array, sizeof(entry) * n, cudaMemcpyHostToDevice);
 
-	dim3 dimBlock(blockSize);
-	dim3 dimGrid(ceil(n/blockSize));
+		dim3 dimBlock(blockSize);
+		dim3 dimGrid(ceil(n/blockSize));
 
-	//stores smoothed average in yValue
-	kernel <<< dimGrid, dimBlock >>>(deviceArray, n, h);
-
-	cudaMemcpy(array, deviceArray, sizeof(entry) * n, cudaMemcpyDeviceToHost);
-	
+		//stores smoothed average in yValue
+		kernel1 <<< dimGrid, dimBlock >>> (deviceArray, n, h);//send to line 96
+		cudaMemcpy(array, deviceArray, sizeof(entry) * n, cudaMemcpyDeviceToHost);
+		
 	//rearrange array in original order
-	for (int i=0; i<n; i++)
-		m[array[i].origIndex] = array[i].yValue;
+		for (int i=0; i<n; i++)
+			m[array[i].origIndex] = array[i].yValue;
+		cudaFree(deviceArray);
+	}//if
+	else //have to chunk up data
+	{
+		int lb, ub;
+		for (int i=0; i<n; i++)
+		{
+			lb = h_binarySearchLB(array, array[i].xValue-h, n);
+			ub = h_binarySearchUB(array, array[i].xValue+h, n);
+			entry * chunkArray = new entry[ub-lb];
+	
+			for (int j=0; j<ub-lb; j++)
+				chunkArray[j] = array[lb+j];
+			
+			cudaMalloc(&deviceArray, sizeof(entry) * (ub-lb));
+			cudaMemcpy(deviceArray, chunkArray, sizeof(entry) * (ub-lb), cudaMemcpyHostToDevice);
 
-	for (int i=0; i<n; i++)
-		printf("%f\n", m[i]);
+			kernel2 <<< 1, 1 >>> (deviceArray, ub-lb);
+			cudaMemcpy(chunkArray, deviceArray, sizeof(entry) * (ub-lb), cudaMemcpyDeviceToHost);
 
-	cudaFree(deviceArray);
+			m[array[i].origIndex] = chunkArray[0].yValue;//store y avg
+			cudaFree(deviceArray);
+			delete [] chunkArray;
+		}//for
+	}//else
+	
 	delete [] array;
 }//smoothc
 
-
+/*
 int main()
 {
-	/*
-  int a, n = 2000000;
+	int n = 200;
 	float * x = new float[n];
 	float * y = new float[n];
 	float * m = new float[n];
 	float h = 2;
 	
-	a=rand();//range of float [-a, a]
-	srand(time(NULL));//init rand() seed
 	for (int i=0; i<n; i++)
 	{
-		x[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
-		y[i] = ((float)rand()/(float)(RAND_MAX)*2*a - a);
-	}//generate random floats for x and y
-*/
-
+		x[i] = rand() % 100;
+		y[i] = rand() % 100;
+	}//for
 	float x[20] = {1, 1,2,2, 3,3, 4,4, 5,5, 6,6, 7,7, 8,8, 9,9, 10,10};
 	float y[20] = {11,11, 12,12, 13,13, 14,14, 15,15, 16,16, 17,17, 18,18, 19,19, 20,20};
 	float m[20];
 	int n = 20;
 	float h = 2;
-
 	smoothc(x, y, m, n, h);
-	//delete [] x;
-	//delete [] y;
-	//delete [] m;
+//	delete [] x;
+//	delete [] y;
+//	delete [] m;
 }//main
+*/
