@@ -1,11 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <R.h>
-#include <Rinternals.h>
 #include <cuda.h>
 
-//nvcc -c shortestPath.cu -Xcompiler "-fpic" -I/usr/include/R
-//R CMD SHLIB shortestPath.o -o shortestPath.so
+//nvcc shortestPath.cu
 
 struct node
 {
@@ -14,7 +11,7 @@ struct node
 	//nodeType - 0 = root, 1 = internal, 2 = tip
 };//node
 
-void setNode(node &phy, int numNodes, int id, int aID, const char * label)
+void setNode(node &phy, int numNodes, int id, int aID, char * label)
 {
 	phy.nodeID = id;
 	phy.ancestor = aID;
@@ -23,44 +20,36 @@ void setNode(node &phy, int numNodes, int id, int aID, const char * label)
 }//setNode
 
 
-__global__ void kernel(node * array, int numNodes, int id, int * ancestorID)
+__global__ void kernel(node * array, int numNodes, int id1, int id2,
+											int * ancestorID1, int * ancestorID2)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
- 
-  if (idx < numNodes)
+	if (idx < numNodes)
 	{
-		int ancestorIndex = 0;
-  	for(int i=0; i<numNodes; i++)
+		if (array[idx].nodeID == id1)
 		{
-			if (array[i].nodeID == id)
-			{
-				node temp = array[i];
-				while (temp.ancestor != 0)
-				{
-					ancestorID[ancestorIndex++] = temp.ancestor;
-					for (int j=0; j<numNodes; i++)
-					{
-						if (array[j].nodeID == temp.ancestor)
-						{
-							temp = array[j];
-							break;
-						}//if
-					}//for
-				}//while
-			}//if
-		}//for
-	}//if
-/*	else if (array[idx].nodeID == id2)
-		{
+			int ancestorIndex = 0;
 			node temp = array[idx];
 			while (temp.ancestor != 0)
 			{
+				ancestorID1[ancestorIndex++] = temp.ancestor;
 				for (int i=0; i<numNodes; i++)
 				{
-					if (ancestorID2[i] != 0)
-						continue;
-					ancestorID2[i] = temp.ancestor;
+					if (array[i].nodeID == temp.ancestor)
+					{
+						temp = array[i];
+						break;
+					}//if
 				}//for
+			}//while
+		}//if	
+		else if (array[idx].nodeID == id2)
+		{
+			int ancestorIndex = 0;
+			node temp = array[idx];
+			while (temp.ancestor != 0)
+			{
+				ancestorID2[ancestorIndex++] = temp.ancestor;
 				for (int i=0; i<numNodes; i++)
 				{
 					if (array[i].nodeID == temp.ancestor)
@@ -71,15 +60,16 @@ __global__ void kernel(node * array, int numNodes, int id, int * ancestorID)
 				}//for
 			}//while
 		}//if
+	
 	}//if
-*/
 }//kernel
 
 
-int * shortestPath(node * phy, int numNodes, const char * label1, const char * label2)
+void shortestPath(node * phy, int numNodes, char * label1, char * label2)
 {
 	node * deviceArray;
-	int * deviceID;
+	int * deviceID1;
+	int * deviceID2;
 	int * ancestorID1 = new int[numNodes];
 	int * ancestorID2 = new int[numNodes];
 	float blockSize = 1024; //num threads per block
@@ -98,63 +88,27 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 
 	if ((temp1.ancestor == temp2.nodeID) || (temp2.ancestor == temp1.nodeID))
 	{
-		return 0;
+		printf("named integer(0)\n");
+		return;
 	}//if
+
+	cudaMalloc(&deviceArray, sizeof(node) * numNodes);
+	cudaMalloc(&deviceID1, sizeof(int) * numNodes);
+	cudaMalloc(&deviceID2, sizeof(int) * numNodes);
+	cudaMemcpy(deviceArray, phy, sizeof(node) * numNodes, cudaMemcpyHostToDevice);	
+	cudaMemcpy(deviceID1, ancestorID1, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(deviceID2, ancestorID2, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
 
 	dim3 dimBlock(blockSize);
 	dim3 dimGrid(ceil(numNodes/blockSize));
 
-	cudaMalloc(&deviceArray, sizeof(node) * numNodes);
-	cudaMalloc(&deviceID, sizeof(int) * numNodes);
-	cudaMemcpy(deviceArray, phy, sizeof(node) * numNodes, cudaMemcpyHostToDevice);	
-	cudaMemcpy(deviceID, ancestorID1, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
-
-  kernel <<< dimBlock, dimGrid >>> (deviceArray, numNodes, temp1.nodeID, deviceID);
-	cudaMemcpy(ancestorID1, deviceID, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
-  
-	int ancestorIndex = 0;
-  for(int i=0; i<numNodes; i++)
-	{
-		if (phy[i].nodeID == temp1.nodeID)
-		{
-			node temp = phy[i];
-			while (temp.ancestor != 0)
-			{
-				ancestorID1[ancestorIndex++] = temp.ancestor;
-				for (int j=0; j<numNodes; i++)
-				{
-					if (array[j].nodeID == temp.ancestor)
-					{
-						temp = phy[j];
-						break;
-					}//if
-				}//for
-			}//while
-		}//if
-	}//for
-	
-	ancestorIndex = 0;
-  for(int i=0; i<numNodes; i++)
-	{
-		if (phy[i].nodeID == temp2.nodeID)
-		{
-			node temp = phy[i];
-			while (temp.ancestor != 0)
-			{
-				ancestorID2[ancestorIndex++] = temp.ancestor;
-				for (int j=0; j<numNodes; i++)
-				{
-					if (array[j].nodeID == temp.ancestor)
-					{
-						temp = phy[j];
-						break;
-					}//if
-				}//for
-			}//while
-		}//if
-	}//for
+	//map phy to complete tree
+	kernel <<< dimGrid, dimBlock >>> (deviceArray, numNodes, temp1.nodeID, temp2.nodeID, deviceID1, deviceID2);
+	cudaMemcpy(ancestorID1, deviceID1, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(ancestorID2, deviceID2, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
 	cudaFree(deviceArray);
-	cudaFree(deviceID);
+	cudaFree(deviceID1);
+	cudaFree(deviceID2);
 
 	//find shortest path
 	int * path = new int[numNodes];
@@ -208,12 +162,6 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 		}//for
 	}//if
 
-  for(int i =0; i < numNodes; i++ ){
-    printf("%d %d\n", ancestorID1[i], ancestorID2[i]);
-    //printf("%d %d %s\n", phy[i].nodeID, phy[i].ancestor, phy[i].label);
-  }
-
-/*	
 	for (int i=0; i<numNodes; i++)
 	{
 		if (path[i] == 0)
@@ -236,43 +184,34 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 		printf("%d ", path[i]);	
 	}//for
 	printf("\n");
-*/
+
 	delete [] ancestorID1;
 	delete [] ancestorID2;
-	//delete [] path;
-	return path;
+	delete [] path;
 }//shortestPath
 
 
-extern "C" SEXP cudaShortestPath(SEXP nodeIDs, SEXP nodeAncestors, SEXP nodeLabels, SEXP n1, SEXP n2)
+int main()
 {
-	nodeIDs = coerceVector(nodeIDs, INTSXP);
-	nodeAncestors = coerceVector(nodeAncestors, INTSXP);
-	nodeLabels = coerceVector(nodeLabels, STRSXP);
-	n1 = coerceVector(n1, STRSXP);
-	n2 = coerceVector(n2, STRSXP);
-	
-	int numNodes = length(nodeIDs);
+	int numNodes = 27;
 	node * phy = new node[numNodes];
+	FILE * infile = fopen("geospiza", "r");
 	
-	for (int i=0; i<numNodes; i++){
-		//printf("%d %d %s\n", INTEGER(nodeIDs)[i], INTEGER(nodeAncestors)[i], CHAR(STRING_ELT(nodeLabels,i)));
-    setNode(phy[i], numNodes, INTEGER(nodeIDs)[i], INTEGER(nodeAncestors)[i], CHAR(STRING_ELT(nodeLabels, i)));
-  }
-	//test shortest path
-	SEXP Rval;
-	PROTECT(Rval = allocVector(INTSXP, numNodes));
-	//printf("%s\n ", CHAR(STRING_ELT(n1,0)));
-  //printf("%d\n", numNodes);
-  int * path = shortestPath(phy, numNodes, CHAR(STRING_ELT(n1, 0)), CHAR(STRING_ELT(n2, 0))); 
+	int nodeID, ancestor;
+	char label[20];
+	for (int i=0; i<numNodes; i++)
+	{
+		fscanf(infile, "%d", &nodeID);
+		fscanf(infile, "%d", &ancestor);
+		fscanf(infile, "%s", &label);
+		setNode(phy[i], numNodes, nodeID, ancestor, label);
+	}//for
+	fclose(infile);
+
+//test shortest path
+	shortestPath(phy, numNodes, "fusca", "fortis"); 
 	
-	for (int i=0; i<numNodes; i++){
-		//printf("%d\n", path[i]);
-    INTEGER(Rval)[i] = path[i];
-  }
 	delete [] phy;
-	delete [] path;
-	UNPROTECT(1);
-	return Rval;
+	return 0;
 }//main
 
