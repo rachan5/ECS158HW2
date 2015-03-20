@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <cuda.h>
 
-//nvcc shortestPath.cu
-
 struct node
 {
 	int nodeID, ancestor;
