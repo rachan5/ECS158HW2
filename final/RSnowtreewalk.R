@@ -381,12 +381,12 @@ descendants <- function (phy, node, type=c("tips","children","all"),cls) {
         
         ## TODO: REPLACE C call with RSnow inplementation of descendants
         ## return indicator matrix of ALL descendants (including self)
-        print("node")
-        print(node)
-        print("ancestor")
-        print(ancestor)
-        print("descendant")
-        print(descendant)
+        #print("node")
+        #print(node)
+        #print("ancestor")
+        #print(ancestor)
+        #print("descendant")
+        #print(descendant)
         #isDes <- .Call("descendants", node, ancestor, descendant)
         #print("real ans")
         #print(isDes)
@@ -397,10 +397,10 @@ descendants <- function (phy, node, type=c("tips","children","all"),cls) {
         rootdex <- which(phy@edge[,1] == 0)
         clusterApply(cls,1:length(cls),setmyid)
         newisDes <- clusterApply(cls,dexgrps,SNOW,length(ancestor),rootdex,"descendants")
-        print("new Dec, return value1")
-        print(newisDes)
-        print("new Dec, return value2")
-        print(matrix(Reduce('+',newisDes),nrow=length(ancestor),ncol=1))
+        #print("new Dec, return value1")
+        #print(newisDes)
+        #print("new Dec, return value2")
+        #print(matrix(Reduce('+',newisDes),nrow=length(ancestor),ncol=1))
         isDes <- (matrix(Reduce('+',newisDes),nrow=length(ancestor),ncol=1))
         storage.mode(isDes) <- "logical"
 
@@ -475,13 +475,13 @@ ancestors <- function (phy, node, type=c("all","parent","ALL"),cls) {
         ## return indicator matrix of ALL ancestors (including self)
         isAnc <- .Call("ancestors", node, ancestor, descendant)
         #print(isAnc)
-        clusterExport(cls,c("node", "ancestor", "descendant","setmyid","SNOW"),envir=environment())
-        dexgrps <- splitIndices(length(ancestor),length(cls))
-        rootdex <- which(phy@edge[,1] == 0)
-        clusterApply(cls,1:length(cls),setmyid)
-        newisAnc <- clusterApply(cls,dexgrps,SNOW,length(ancestor),rootdex,"ancestors")
+        #clusterExport(cls,c("node", "ancestor", "descendant","setmyid","SNOW"),envir=environment())
+        #dexgrps <- splitIndices(length(ancestor),length(cls))
+        #rootdex <- which(phy@edge[,1] == 0)
+        #clusterApply(cls,1:length(cls),setmyid)
+        #newisAnc <- clusterApply(cls,dexgrps,SNOW,length(ancestor),rootdex,"ancestors")
         #isAnc <- (matrix(Reduce('+',newisAnc),nrow=length(ancestor),ncol=1))
-        print(newisAnc)
+        #print(newisAnc)
         storage.mode(isAnc) <- "logical"
 
         ## drop self if needed

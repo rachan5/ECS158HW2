@@ -31,6 +31,14 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
   
   if (idx < numNodes)
 	{
+    /**
+    for(int i = 0; i < numNodes; i++)
+    {
+      ancestorID2[i] = 1;
+		  ancestorID1[i] = 2;
+    
+    }**/
+
     if (array[idx].nodeID == id1)
 		{
 			node temp = array[idx];
@@ -114,7 +122,8 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 	dim3 dimGrid(ceil(numNodes/blockSize));
 
 	//map phy to complete tree
-	kernel <<< dimGrid, dimBlock >>> (deviceArray, numNodes, temp1.nodeID, temp2.nodeID, deviceID1, deviceID2);
+	printf("%d %d \n", temp1.nodeID, temp2.nodeID);
+  kernel <<< dimGrid, dimBlock >>> (deviceArray, numNodes, temp1.nodeID, temp2.nodeID, deviceID1, deviceID2);
 	cudaMemcpy(ancestorID1, deviceID1, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
 	cudaMemcpy(ancestorID2, deviceID2, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
 	cudaFree(deviceArray);
