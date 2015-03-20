@@ -31,19 +31,17 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
   
   if (idx < numNodes)
 	{
-    for(int i = 0; i < numNodes; i++)
-    {
-      ancestorID2[i] = 1;
-		  ancestorID1[i] = 2;
-    
-    }/**
     if (array[idx].nodeID == id1)
 		{
-			int ancestorIndex = 0;
 			node temp = array[idx];
 			while (temp.ancestor != 0)
 			{
-				ancestorID1[ancestorIndex++] = temp.ancestor;
+				for (int i=0; i<numNodes; i++)
+				{
+					if (ancestorID1[i] != 0)
+						continue;
+					ancestorID1[i] = temp.ancestor;
+				}//for
 				for (int i=0; i<numNodes; i++)
 				{
 					if (array[i].nodeID == temp.ancestor)
@@ -56,11 +54,15 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 		}//if	
 		else if (array[idx].nodeID == id2)
 		{
-			int ancestorIndex = 0;
 			node temp = array[idx];
 			while (temp.ancestor != 0)
 			{
-				ancestorID2[ancestorIndex++] = temp.ancestor;
+				for (int i=0; i<numNodes; i++)
+				{
+					if (ancestorID2[i] != 0)
+						continue;
+					ancestorID2[i] = temp.ancestor;
+				}//for
 				for (int i=0; i<numNodes; i++)
 				{
 					if (array[i].nodeID == temp.ancestor)
@@ -71,7 +73,6 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 				}//for
 			}//while
 		}//if
-	**/
 	}//if
 }//kernel
 
