@@ -25,31 +25,31 @@ void setNode(node &phy, int numNodes, int id, int aID, const char * label)
 
 __global__ void kernel(node * array, int numNodes, int id, int * ancestorID)
 {
-	//int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
  
-  //if (idx < numNodes)
-//	{
-	int ancestorIndex = 0;
-  for(int i=0; i<numNodes; i++)
+  if (idx < numNodes)
 	{
-		if (array[i].nodeID == id)
+		int ancestorIndex = 0;
+  	for(int i=0; i<numNodes; i++)
 		{
-			node temp = array[i];
-			while (temp.ancestor != 0)
+			if (array[i].nodeID == id)
 			{
-				ancestorID[ancestorIndex++] = temp.ancestor;
-				}//for
-				for (int j=0; j<numNodes; i++)
+				node temp = array[i];
+				while (temp.ancestor != 0)
 				{
-					if (array[j].nodeID == temp.ancestor)
+					ancestorID[ancestorIndex++] = temp.ancestor;
+					for (int j=0; j<numNodes; i++)
 					{
-						temp = array[j];
-						break;
-					}//if
-				}//for
-			}//while
-		}//if
-	}//for
+						if (array[j].nodeID == temp.ancestor)
+						{
+							temp = array[j];
+							break;
+						}//if
+					}//for
+				}//while
+			}//if
+		}//for
+	}//if
 /*	else if (array[idx].nodeID == id2)
 		{
 			node temp = array[idx];
@@ -82,7 +82,7 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 	int * deviceID;
 	int * ancestorID1 = new int[numNodes];
 	int * ancestorID2 = new int[numNodes];
-	float blockSize = 2; //num threads per block
+	float blockSize = 1024; //num threads per block
 
 	//check if invalid query
 	node temp1, temp2;
@@ -101,18 +101,58 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 		return 0;
 	}//if
 
+	dim3 dimBlock(blockSize);
+	dim3 dimGrid(ceil(numNodes/blockSize));
+
 	cudaMalloc(&deviceArray, sizeof(node) * numNodes);
 	cudaMalloc(&deviceID, sizeof(int) * numNodes);
 	cudaMemcpy(deviceArray, phy, sizeof(node) * numNodes, cudaMemcpyHostToDevice);	
-
 	cudaMemcpy(deviceID, ancestorID1, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
-  kernel <<< 1, 1 >>> (deviceArray, numNodes, temp1.nodeID, deviceID);
+
+  kernel <<< dimBlock, dimGrid >>> (deviceArray, numNodes, temp1.nodeID, deviceID);
 	cudaMemcpy(ancestorID1, deviceID, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
   
+	int ancestorIndex = 0;
+  for(int i=0; i<numNodes; i++)
+	{
+		if (phy[i].nodeID == temp1.nodeID)
+		{
+			node temp = phy[i];
+			while (temp.ancestor != 0)
+			{
+				ancestorID1[ancestorIndex++] = temp.ancestor;
+				for (int j=0; j<numNodes; i++)
+				{
+					if (array[j].nodeID == temp.ancestor)
+					{
+						temp = phy[j];
+						break;
+					}//if
+				}//for
+			}//while
+		}//if
+	}//for
 	
-	cudaMemcpy(deviceID, ancestorID2, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
-	kernel <<< 1, 1 >>> (deviceArray, numNodes, temp2.nodeID, deviceID);
-	cudaMemcpy(ancestorID2, deviceID2, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
+	ancestorIndex = 0;
+  for(int i=0; i<numNodes; i++)
+	{
+		if (phy[i].nodeID == temp2.nodeID)
+		{
+			node temp = phy[i];
+			while (temp.ancestor != 0)
+			{
+				ancestorID2[ancestorIndex++] = temp.ancestor;
+				for (int j=0; j<numNodes; i++)
+				{
+					if (array[j].nodeID == temp.ancestor)
+					{
+						temp = phy[j];
+						break;
+					}//if
+				}//for
+			}//while
+		}//if
+	}//for
 	cudaFree(deviceArray);
 	cudaFree(deviceID);
 
