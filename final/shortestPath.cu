@@ -27,9 +27,17 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 											int * ancestorID1, int * ancestorID2)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx < numNodes)
+	
+  
+  if (idx < numNodes)
 	{
-		if (array[idx].nodeID == id1)
+    for(int i = 0; i < numNodes; i++)
+    {
+      ancestorID2[i] = 1;
+		  ancestorID1[i] = 2;
+    
+    }/**
+    if (array[idx].nodeID == id1)
 		{
 			int ancestorIndex = 0;
 			node temp = array[idx];
@@ -63,7 +71,7 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 				}//for
 			}//while
 		}//if
-	
+	**/
 	}//if
 }//kernel
 
@@ -164,7 +172,12 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 		}//for
 	}//if
 
-	/*
+  for(int i =0; i < numNodes; i++ ){
+    printf("%d %d\n", ancestorID1[i], ancestorID2[i]);
+    //printf("%d %d %s\n", phy[i].nodeID, phy[i].ancestor, phy[i].label);
+  }
+
+/*	
 	for (int i=0; i<numNodes; i++)
 	{
 		if (path[i] == 0)
@@ -195,7 +208,7 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 }//shortestPath
 
 
-SEXP cudaShortestPath(SEXP nodeIDs, SEXP nodeAncestors, SEXP nodeLabels, SEXP n1, SEXP n2)
+extern "C" SEXP cudaShortestPath(SEXP nodeIDs, SEXP nodeAncestors, SEXP nodeLabels, SEXP n1, SEXP n2)
 {
 	nodeIDs = coerceVector(nodeIDs, INTSXP);
 	nodeAncestors = coerceVector(nodeAncestors, INTSXP);
@@ -206,17 +219,21 @@ SEXP cudaShortestPath(SEXP nodeIDs, SEXP nodeAncestors, SEXP nodeLabels, SEXP n1
 	int numNodes = length(nodeIDs);
 	node * phy = new node[numNodes];
 	
-	for (int i=0; i<numNodes; i++)
-		setNode(phy[i], numNodes, INTEGER(nodeIDs)[i], INTEGER(nodeAncestors)[i], CHAR(STRING_ELT(nodeLabels, i)));
-
+	for (int i=0; i<numNodes; i++){
+		//printf("%d %d %s\n", INTEGER(nodeIDs)[i], INTEGER(nodeAncestors)[i], CHAR(STRING_ELT(nodeLabels,i)));
+    setNode(phy[i], numNodes, INTEGER(nodeIDs)[i], INTEGER(nodeAncestors)[i], CHAR(STRING_ELT(nodeLabels, i)));
+  }
 	//test shortest path
 	SEXP Rval;
 	PROTECT(Rval = allocVector(INTSXP, numNodes));
-	int * path = shortestPath(phy, numNodes, CHAR(STRING_ELT(n1, 0)), CHAR(STRING_ELT(n2, 0))); 
+	//printf("%s\n ", CHAR(STRING_ELT(n1,0)));
+  //printf("%d\n", numNodes);
+  int * path = shortestPath(phy, numNodes, CHAR(STRING_ELT(n1, 0)), CHAR(STRING_ELT(n2, 0))); 
 	
-	for (int i=0; i<numNodes; i++)
-		INTEGER(Rval)[i] = path[i];
-
+	for (int i=0; i<numNodes; i++){
+		//printf("%d\n", path[i]);
+    INTEGER(Rval)[i] = path[i];
+  }
 	delete [] phy;
 	delete [] path;
 	UNPROTECT(1);
