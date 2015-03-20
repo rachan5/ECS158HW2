@@ -15,14 +15,19 @@ phylobase/R contains the R source code (take a look at treewalk.R)
 
 phylocase/src contain the C/C++ source code (take a look at ancestors.c)
 
+msdir/set1 contains some test cases with kinda of big trees, testing script coming soon
+
 ------
 ### List of things to do (in no particular order): ###
 
 * Figure out how to *assemble code in a formal R package, that is, it must build on CSIF using "R CMD INSTALL" command*.
 
 * Find a LARGE test cases for time comparison between the different implementations.
-	* Generate Newick tree format data file (Ray has)
-	* use readNewick() function from phylobase package
+	~~ * Generate Newick tree format data file (Ray has) ~~
+	~~ * use readNewick() function from phylobase package ~~
+    * Create said LARGE test cases (>10^4 leaves)
+
+* Generate testing script to test native/serial case
 
 * Start documenting references used 
 
