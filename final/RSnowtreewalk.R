@@ -1,248 +1,4 @@
-## matching node labels with node numbers ...
-## e.g.
-## 14 tips, 13 int nodes
-## N04 = nodeLabels[4]
-##   <-> node 18
-## x = n-nTips(phy)
-## so:     n = x+nTips(phy)
-
-
-
-#' node and edge look-up functions
-#' 
-#' Functions for retrieving node and edge IDs (possibly with corresponding
-#' labels) from a phylogenetic tree.
-#' 
-#' \code{getNode} and \code{getEdge} are primarily intended for looking up the
-#' IDs either of nodes themselves or of edges associated with those nodes. Note
-#' that they behave quite differently. With \code{getNode}, any input nodes are
-#' looked up against tree nodes of the specified type, and those that match are
-#' returned as numeric node IDs with node labels (if they exist) as element
-#' names. With \code{getEdge}, any input nodes are looked up against edge ends
-#' of the specified type, and those that match are returned as character edge
-#' IDs with the corresponding node ID as element names.
-#' 
-#' If \code{missing} is \dQuote{warn} or \dQuote{OK}, \code{NA} is returned for
-#' any nodes that are unmatched for the specified type. This can provide a
-#' mechanism for filtering a set of nodes or edges.
-#' 
-#' \code{nodeId} provides similar output to \code{getNode} in the case when no
-#' node is supplied, but it is faster and returns an unnamed vector of the
-#' numeric IDs of all nodes of the specified node type.  Similarly,
-#' \code{edgeId} simply returns an unnamed vector of the character IDs of all
-#' edges for which the descendant node is of the specified node type.
-#' 
-#' @aliases getNode getEdge nodeId nodeId,phylo4-method edgeId
-#' edgeId,phylo4-method
-#' @param x a \linkS4class{phylo4} object (or one inheriting from
-#' \linkS4class{phylo4}, e.g. a \linkS4class{phylo4d} object)
-#' @param node either an integer vector corresponding to node ID numbers, or a
-#' character vector corresponding to node labels; if missing, all nodes
-#' appropriate to the specified type will be returned by \code{getNode}, and
-#' all edges appropriate to the specified type will be returned by
-#' \code{getEdge}.
-#' @param type (\code{getNode}) specify whether to return nodes matching "all"
-#' tree nodes (default), only "tip" nodes, or only "internal" nodes;
-#' (\code{nodeId, edgeId}) specify whether to return "all" tree nodes, or only
-#' those corresponding to "tip", "internal", or "root" nodes; (\code{getEdge})
-#' specify whether to look up edges based on their descendant node
-#' ("descendant") or ancestral node ("ancestor")
-#' @param missing what to do if some requested node IDs or names are not in the
-#' tree: warn, do nothing, or stop with an error
-#' @return \item{list("getNode")}{returns a named integer vector of node IDs,
-#' in the order of input nodes if provided, otherwise in nodeId order}
-#' \item{list("getEdge")}{returns a named character vector of edge IDs, in the
-#' order of input nodes if provide, otherwise in nodeId order}
-#' \item{list("nodeId")}{returns an unnamed integer vector of node IDs, in
-#' ascending order} \item{list("getEdge")}{returns an unnamed character vector
-#' of edge IDs, in edge matrix order}
-#' @keywords misc
-#' @examples
-#' 
-#'   data(geospiza)
-#'   nodeLabels(geospiza) <- LETTERS[1:nNodes(geospiza)]
-#'   plot(as(geospiza, "phylo4"), show.node.label=TRUE)
-#'   getNode(geospiza, 18)
-#'   getNode(geospiza, "D")
-#'   getEdge(geospiza, "D")
-#'   getEdge(geospiza, "D", type="ancestor")
-#' 
-#'   ## match nodes only to tip nodes, flagging invalid cases as NA
-#'   getNode(geospiza, c(1, 18, 999), type="tip", missing="OK")
-#' 
-#'   ## get all edges that descend from internal nodes
-#'   getEdge(geospiza, type="ancestor")
-#' 
-#'   ## identify an edge from its terminal node
-#'   getEdge(geospiza, c("olivacea", "B", "fortis"))
-#'   getNode(geospiza, c("olivacea", "B", "fortis"))
-#'   edges(geospiza)[c(26, 1, 11),]
-#' 
-#'   ## quickly get all tip node IDs and tip edge IDs
-#'   nodeId(geospiza, "tip")
-#'   edgeId(geospiza, "tip")
-#' 
-getNode <- function(x, node, type=c("all", "tip", "internal"),
-    missing=c("warn","OK","fail")) {
-
-    type <- match.arg(type)
-    missing <- match.arg(missing)
-
-    ## if missing node arg, get all nodes of specified type
-    if (missing(node)) {
-        node <- nodeId(x, type)
-    }
-
-    if (length(node) == 0) {
-      rval <- integer(0)
-      names(rval) <- character(0)
-      return(rval)
-    }
-    
-    lblTmp <- labels(x, type)
-    
-    ## match node to tree
-    if (is.character(node)) {
-        ndTmp <- paste("^\\Q", node, "\\E$", sep="")        
-        irval <- lapply(ndTmp, function(ND) {
-            grep(ND, lblTmp, perl=TRUE)
-        })
-        irvalL <- sapply(irval, length)
-        irval[irvalL == 0] <- 0
-        irval <- unlist(irval)
-    } else if (is.numeric(node) && all(floor(node) == node, na.rm=TRUE)) {
-        irval <- match(as.character(node), names(lblTmp))
-    } else {
-        stop("Node must be a vector of class \'integer\' or \'character\'.")
-    }
-
-    ## node numbers
-    rval <- names(lblTmp)[irval]
-    rval[is.na(node)] <- NA # return NA for any NA_character_ inputs, not needed but ensure rval has correct length
-    rval <- as.integer(rval)
-
-    ## node labels
-    nmNd <- lblTmp[irval]
-    names(rval) <- nmNd
-    
-    ## deal with nodes that don't match
-    if (any(is.na(rval))) {
-        missnodes <- node[is.na(rval)]
-        msg <- paste("Some nodes not found among", type, "nodes in tree:",
-            paste(missnodes,collapse=", "))
-        if (missing=="fail") {
-            stop(msg)
-        } else if (missing=="warn") {
-            warning(msg)
-        }
-    }
-    return(rval)
-}
-
-
-#' tree traversal and utility functions
-#' 
-#' Functions for describing relationships among phylogenetic nodes (i.e.
-#' internal nodes or tips).
-#' 
-#' \code{ancestors} and \code{descendants} can take \code{node} vectors of
-#' arbitrary length, returning a list of output vectors if the number of valid
-#' input nodes is greater than one. List element names are taken directly from
-#' the input node vector.
-#' 
-#' If any supplied nodes are not found in the tree, the behavior currently
-#' varies across functions. Invalid nodes are automatically omitted by
-#' \code{ancestors} and \code{descendants}, with a warning.  \code{ancestor}
-#' will return \code{NA} for any invalid nodes, with a warning. Both
-#' \code{children} and \code{siblings} will return an empty vector, again with
-#' a warning. In contrast, \code{MRCA} and \code{shortestPath} will throw an
-#' immediate error if any input nodes are invalid.
-#' 
-#' @aliases children descendants ancestor ancestors siblings MRCA shortestPath
-#' sumEdgeLength sumEdgeLength,phylo4-method
-#' @param phy a \linkS4class{phylo4} object (or one inheriting from
-#' \linkS4class{phylo4}, e.g. a \linkS4class{phylo4d} object)
-#' @param x a \linkS4class{phylo4} object (or one inheriting from
-#' \linkS4class{phylo4}, e.g. a \linkS4class{phylo4d} object)
-#' @param node either an integer corresponding to a node ID number, or a
-#' character corresponding to a node label; for \code{ancestors} and
-#' \code{descendants}, this may be a vector of multiple node numbers or names
-#' @param type (\code{ancestors}) specify whether to return just direct
-#' ancestor ("parent"), all ancestor nodes ("all"), or all ancestor nodes
-#' including self ("ALL"); (\code{descendants}) specify whether to return just
-#' direct descendants ("children"), all extant descendants ("tips"), or all
-#' descendant nodes ("all")
-#' @param include.self whether to include self in list of siblings
-#' @param \dots a list of node numbers or names, or a vector of node numbers or
-#' names
-#' @param node1 a node number (or name)
-#' @param node2 a node number (or name)
-#' @return \item{list("ancestors")}{ return a named vector (or a list of such
-#' vectors in the case of multiple input nodes) of the ancestors and
-#' descendants of a node}\item{ and }{ return a named vector (or a list of such
-#' vectors in the case of multiple input nodes) of the ancestors and
-#' descendants of a node}\item{list("descendants")}{ return a named vector (or
-#' a list of such vectors in the case of multiple input nodes) of the ancestors
-#' and descendants of a node} \item{list("ancestor")}{ \code{ancestor} is
-#' analogous to \code{ancestors(\dots{}, type="parent")} (i.e. direct ancestor
-#' only), but returns a single concatenated vector in the case of multiple
-#' input nodes; \code{children} is analogous to \code{descendants(\dots{},
-#' type="children")} (i.e. direct descendants only), but is not currently
-#' intended to be used with multiple input nodes }\item{ and }{ \code{ancestor}
-#' is analogous to \code{ancestors(\dots{}, type="parent")} (i.e. direct
-#' ancestor only), but returns a single concatenated vector in the case of
-#' multiple input nodes; \code{children} is analogous to
-#' \code{descendants(\dots{}, type="children")} (i.e. direct descendants only),
-#' but is not currently intended to be used with multiple input nodes
-#' }\item{list("children")}{ \code{ancestor} is analogous to
-#' \code{ancestors(\dots{}, type="parent")} (i.e. direct ancestor only), but
-#' returns a single concatenated vector in the case of multiple input nodes;
-#' \code{children} is analogous to \code{descendants(\dots{}, type="children")}
-#' (i.e. direct descendants only), but is not currently intended to be used
-#' with multiple input nodes } \item{list("siblings")}{ returns sibling nodes
-#' (children of the same parent)} \item{list("MRCA")}{ returns the most recent
-#' common ancestor of two or more nodes} \item{list("shortestPath")}{ returns
-#' the nodes of the shortest path from one node to another (excluding
-#' \code{node1} and \code{node2})} \item{list("sumEdgeLength")}{ returns the
-#' sum of branch length for branches starting at nodes provided}
-#' @note \code{MRCA} is uppercase to avoid conflict with \code{mrca} in ape
-#' @seealso \code{\link[ape]{mrca}}, in the ape package, gives a list of all
-#' subtrees
-#' @keywords misc
-#' @examples
-#' 
-#'   data(geospiza)
-#'   nodeLabels(geospiza) <- LETTERS[1:nNodes(geospiza)]
-#'   plot(as(geospiza, "phylo4"), show.node.label=TRUE)
-#'   ancestor(geospiza, "E")
-#'   children(geospiza, "C")
-#'   descendants(geospiza, "D", type="tips")
-#'   descendants(geospiza, "D", type="all")
-#'   ancestors(geospiza, "D")
-#'   MRCA(geospiza, "conirostris", "difficilis", "fuliginosa")
-#'   MRCA(geospiza, "olivacea", "conirostris")
-#' 
-#'   ## shortest path between 2 nodes
-#'   shortestPath(geospiza, "fortis", "fuliginosa")
-#'   shortestPath(geospiza, "F", "L")
-#' 
-#'   ## branch length from a tip to the root
-#'   sumEdgeLength(geospiza, ancestors(geospiza, "fortis", type="ALL"))
-ancestor <- function(phy,node) {
-    node2 <- getNode(phy,node)
-    ## r <- which(edges(phy)[,2]==node)
-    r <- match(node2,edges(phy)[,2])
-    return(getNode(phy,edges(phy)[r,1],missing="OK"))
-}
-
-
-children <- function(phy,node) {
-    node2 <- getNode(phy,node)
-    r <- which(edges(phy)[,1]==node2)
-    getNode(phy,edges(phy)[r,2])
-}
-
-SNOW <- function(x,size,root,type=c("descendants","ancestors")){
+SNOW <- function(x,size,root,type=c("descendants")){
     ans <- rep(0,size)
     mystart <- (myid-1)*length(x)+1
     myend <- myid*length(x)
@@ -251,18 +7,15 @@ SNOW <- function(x,size,root,type=c("descendants","ancestors")){
     if (type == "descendants"){
         v1 <- descendant
         v2 <- ancestor
-        #}#original endif for type == descendants
         #initalization
         temp <- v1[mystart:myend]
         
         #second and beyond iteration
         for (j in 1:size){ 
-            #if (type == "descendants"){
             if (node %in% temp){
                 setthese <- which(temp == node) + mystart-1
                 ans[setthese] <- 1
             }
-            #}
             blah <- rep(-1,length(temp))
             for (i in (1:length(temp))){
                 matched_pos <- which(v1 == temp[i])
@@ -274,7 +27,6 @@ SNOW <- function(x,size,root,type=c("descendants","ancestors")){
                     if (type == "descendants"){
                         blah[i] <- 1
                     }
-                    #blah[which(temp == temp[i])] <- which(temp == temp[i])
                 }
             }#for i 
             #"go to your parents set"
@@ -289,73 +41,15 @@ SNOW <- function(x,size,root,type=c("descendants","ancestors")){
             }
         }#j loop
     }#new endif for type==descendants
-    if (type == "ancestors"){
-        v1 <- descendant
-        v2 <- ancestor
-        #initalization
-        temp <- v1[mystart:myend]
-        #return(temp) 
-        for (t in 1:2){
-        #go to you descendant
-        for (i in (1:length(temp))){
-            #find where ancestors match
-            matched_pos <- which(v2 == temp[i])
-            #if there's ancestors
-            if (length(matched_pos) != 0){ #temp exists in ancestor 
-                #go through each match
-                flag <- FALSE
-                for (k in 1:length(matched_pos)){
-                    #if match's descendant == node
-                    if(v1[matched_pos[k]] == node){
-                        #mark it in ans
-                        ans[matched_pos[k]] <- 1
-                    }
-                    #if match's descendant exists in ancestor
-                    if(v1[matched_pos[k]] %in% v2){
-                        #find where it matched ancestor
-                        again <- which(v2 == v1[matched_pos[k]])
-                        for (w in 1:length(again)){
-                            #check if this match's descendant IS IN ANCESTOR
-                            if (v1[again[w]] %in% v2){
-                                #update temp
-                                flag <- FALSE
-                                setthese <- which(temp == v2[again[w]])
-                                temp[setthese] <- v1[again[w]]
-                            }#endif        
-                            else{
-                                flag <- FALSE
-                                setthese <- which(temp == v1[again[w]])
-                                temp[setthese] <- 0
-                            }
-                        }#end for w
-                    }#end if
-                    else{
-                        flag <- TRUE
-                    }
-                    if(k == length(matched_pos) && flag){
-                        temp[i] <- 0
-                    }
-                }#end for k
-            }#end if
-            else{
-                temp[i] <- 0
-            }
-        }#for i 
-        }
-        return(temp)
-        #if (node %in% temp){
-        #    setthese <- which(temp == node) + mystart-1
-        #    ans[setthese] <- 1
-        #}
-    }#new endif for type==ancestors
     return(ans)
-}
+}# end SNOW
 
 setmyid <- function(i){
     myid <<- i
 }
-## get descendants [recursively]
-descendants <- function (phy, node, type=c("tips","children","all"),cls) {
+
+## get descendants with RSnow
+RSnowdescendants <- function (phy, node, type=c("tips","children","all"),cls) {
     type <- match.arg(type)
 
     ## look up nodes, warning about and excluding invalid nodes
@@ -370,37 +64,22 @@ descendants <- function (phy, node, type=c("tips","children","all"),cls) {
         if (length(res)==1) res <- res[[1]]
     } else {
         ## edge matrix must be in preorder for the C function!
-        if (phy@order=="preorder") {
+        #if (phy@order=="preorder") {
             edge <- phy@edge
-        } else {
-            edge <- reorder(phy, order="postorder")@edge
-        }
+        #} else {
+        #    edge <- reorder(phy, order="postorder")@edge
+        #}
         ## extract edge columns
         ancestor <- as.integer(edge[, 1])
         descendant <- as.integer(edge[, 2])
         
-        ## TODO: REPLACE C call with RSnow inplementation of descendants
         ## return indicator matrix of ALL descendants (including self)
-        print("node")
-        print(node)
-        print("ancestor")
-        print(ancestor)
-        print("descendant")
-        print(descendant)
         #isDes <- .Call("descendants", node, ancestor, descendant)
-        #print("real ans")
-        #print(isDes)
         clusterExport(cls,c("node", "ancestor", "descendant","setmyid","SNOW"),envir=environment())
         dexgrps <- splitIndices(length(ancestor),length(cls))
-        #print("dexgrps")
-        #print(dexgrps)
         rootdex <- which(phy@edge[,1] == 0)
         clusterApply(cls,1:length(cls),setmyid)
         newisDes <- clusterApply(cls,dexgrps,SNOW,length(ancestor),rootdex,"descendants")
-        print("new Dec, return value1")
-        print(newisDes)
-        print("new Dec, return value2")
-        print(matrix(Reduce('+',newisDes),nrow=length(ancestor),ncol=1))
         isDes <- (matrix(Reduce('+',newisDes),nrow=length(ancestor),ncol=1))
         storage.mode(isDes) <- "logical"
 
@@ -408,6 +87,7 @@ descendants <- function (phy, node, type=c("tips","children","all"),cls) {
         int.node <- intersect(node, nodeId(phy, "internal"))
         isDes[cbind(match(int.node, descendant),
             match(int.node, node))] <- FALSE
+        
         ## if only tips desired, drop internal nodes
         if (type=="tips") {
             isDes[descendant %in% nodeId(phy, "internal"),] <- FALSE
@@ -419,147 +99,22 @@ descendants <- function (phy, node, type=c("tips","children","all"),cls) {
     ## names(res) <- as.character(oNode[isValid])
 
     res
-
-    ## Original pure R implementation of the above
-    ## (note that it does not require preorder ordering)
-    ##n <- nTips(phy)
-    ##if (node <= n) {
-    ##    return(node)
-    ##}
-    ##l <- numeric()
-    ##d <- children(phy, node)
-    ##for (j in d) {
-    ##    if (j <= n)
-    ##      l <- c(l,j)
-    ##    else if (type=="all") l <- c(l,j,
-    ##               descendants(phy,j,type="all"))
-    ##    else l <- c(l, descendants(phy,j,type=type))
-    ##}
 }
-
-siblings <- function(phy, node, include.self=FALSE) {
-    v <- children(phy,ancestor(phy,node))
-    if (!include.self) v <- v[v!=getNode(phy,node)]
-    v
-}
-
-## get ancestors (all nodes)
-ancestors <- function (phy, node, type=c("all","parent","ALL"),cls) {
-
-    type <- match.arg(type)
-
-    ## look up nodes, warning about and excluding invalid nodes
-    oNode <- node
-    node <- getNode(phy, node, missing="warn")
-    isValid <- !is.na(node)
-    node <- as.integer(node[isValid])
-
-    if (length(node) == 0) {
-      return(NA)
-    }
-    
-    if (type == "parent") {
-        res <- lapply(node, function(x) ancestor(phy, x))
-    } else {
-        ## edge matrix must be in postorder for the C function!
-        if (phy@order=="postorder") {
-            edge <- phy@edge
-        } else {
-            edge <- reorder(phy, order="postorder")@edge
-        }
-        ## extract edge columns
-        ancestor <- as.integer(edge[, 1])
-        descendant <- as.integer(edge[, 2])
-        
-        ## TODO: REPLACE C call with RSnow inplementation of ancestors
-        ## return indicator matrix of ALL ancestors (including self)
-        isAnc <- .Call("ancestors", node, ancestor, descendant)
-        #print(isAnc)
-        clusterExport(cls,c("node", "ancestor", "descendant","setmyid","SNOW"),envir=environment())
-        dexgrps <- splitIndices(length(ancestor),length(cls))
-        rootdex <- which(phy@edge[,1] == 0)
-        clusterApply(cls,1:length(cls),setmyid)
-        newisAnc <- clusterApply(cls,dexgrps,SNOW,length(ancestor),rootdex,"ancestors")
-        #isAnc <- (matrix(Reduce('+',newisAnc),nrow=length(ancestor),ncol=1))
-        print(newisAnc)
-        storage.mode(isAnc) <- "logical"
-
-        ## drop self if needed
-        if (type=="all") {
-            isAnc[cbind(match(node, descendant), seq_along(node))] <- FALSE
-        }
-        res <- lapply(seq_along(node), function(n) getNode(phy,
-            descendant[isAnc[,n]]))
-    }
-    names(res) <- as.character(oNode[isValid])
-
-    ## if just a single node, return as a single vector
-    if (length(res)==1) res <- res[[1]]
-    res
-
-    ## Original pure R implementation of the above
-    ## (note that it does not require preorder ordering)
-    ##if (node == rootNode(phy))
-    ##    return(NULL)
-    ##repeat {
-    ##    anc <- ancestor(phy, node)
-    ##    res <- c(res, anc)
-    ##    node <- anc
-    ##    if (anc == n + 1)
-    ##        break
-    ##}
-}
-
-MRCA <- function(phy, ...) {
-    nodes <- list(...)
-    ## if length==1 and first element is a vector,
-    ##   use it as the list
-    if (length(nodes)==1 && length(nodes[[1]])>1) {
-        nodes <- as.list(nodes[[1]])
-    }
-
-    ## Correct behavior when the root is part of the nodes
-    testNodes <- lapply(nodes, getNode, x=phy)
-    ## BMB: why lapply, not sapply?
-    lNodes <- unlist(testNodes)
-    if (any(is.na(lNodes)))
-      stop("nodes not found in tree: ",paste(names(lNodes)[is.na(lNodes)],
-                                             collapse=", "))
-    uniqueNodes <- unique(testNodes)
-    root <- nTips(phy)+1
-    ## Handles case where root is a node of interest, return root
-    if(root %in% uniqueNodes) {
-        res <- getNode(phy, root)
-        return(res)
-    }
-    ## Correct behavior in case of MRCA of identical taxa
-    if(length(uniqueNodes) == 1) {
-        res <- uniqueNodes[[1]]
-        return(res)
-    }
-    else { ## else length(uniqueNodes > 1)
-        ancests <- lapply(nodes, ancestors, phy=phy, type="ALL")
-        res <- getNode(phy, max(Reduce(intersect, ancests)))
-        return(res)
-    }
-} # end MRCA
-
 
 ###############
 # shortestPath
 ###############
-shortestPath <- function(phy, node1, node2){
 
-  ## conversion from phylo, phylo4 and phylo4d
-  if (class(phy) == "phylo4d") {
-    x <- extractTree(phy)
-  }
-  else if (class(phy) != "phylo4"){
-    x <- as(phy, "phylo4")
-  }
+RSnowshortestPath <- function(phy, node1, node2,cls){
 
+    ## conversion from phylo, phylo4 and phylo4d
+    if (class(phy) == "phylo4d") {
+        x <- extractTree(phy)
+    }
+    else if (class(phy) != "phylo4"){
+        x <- as(phy, "phylo4")
+    }
     ## some checks
-    ## if (is.character(checkval <- checkPhylo4(x))) stop(checkval) # no need
     t1 <- getNode(x, node1)
     t2 <- getNode(x, node2)
     if(any(is.na(c(t1,t2)))) stop("wrong node specified")
@@ -567,7 +122,7 @@ shortestPath <- function(phy, node1, node2){
 
     ## main computations
     comAnc <- MRCA(x, t1, t2) # common ancestor
-    desComAnc <- descendants(x, comAnc, type="all")
+    desComAnc <- RSnowdescendants(x, comAnc, type="all",cls)
     ancT1 <- ancestors(x, t1, type="all")
     path1 <- intersect(desComAnc, ancT1) # path: common anc -> t1
 
@@ -584,56 +139,3 @@ shortestPath <- function(phy, node1, node2){
 
     return(res)
 } # end shortestPath
-
-
-
-###########
-# getEdge
-###########
-getEdge <- function(x, node, type=c("descendant", "ancestor"),
-    missing=c("warn", "OK", "fail")) {
-
-    if(!identical(class(x), "phylo4")) x <- as(x, "phylo4")
-
-    type <- match.arg(type)
-    missing <- match.arg(missing)
-    if (missing(node)) {
-        if (type=="descendant") {
-            node <- nodeId(x, "all")
-        } else if (type=="ancestor") {
-            node <- nodeId(x, "internal")
-        }
-    }
-
-    node.id <- getNode(x, node, missing="OK")
-
-    nd <- lapply(node.id, function(nid) {
-        if (is.na(nid)) {
-            res <- NA
-        } else {
-            res <- switch(type,
-                descendant = edgeId(x)[edges(x)[,2] %in% nid],
-                ancestor = edgeId(x)[edges(x)[,1] %in% nid])
-            ## hack to return NA for tip nodes when type='ancestor'
-            if(length(res)==0) res <- NA
-            names(res) <- rep(nid, length(res))
-        }
-        names(res) <- rep(nid, length(res))
-        res
-    })
-
-    ## warn or stop if necessary
-    is.missing <- is.na(nd)
-    if (missing!="OK" && any(is.missing)) {
-        msg <- paste("Not all nodes are ", type, "s in this tree: ",
-            paste(node[is.missing], collapse=", "), sep="")
-        if (missing=="fail") {
-            stop(msg)
-        } else if (missing=="warn") {
-            warning(msg)
-        }
-    }
-
-    return(unlist(unname(nd)))
-
-}
