@@ -23,44 +23,34 @@ void setNode(node &phy, int numNodes, int id, int aID, const char * label)
 }//setNode
 
 
-__global__ void kernel(node * array, int numNodes, int id1, int id2,
-											int * ancestorID1, int * ancestorID2)
+__global__ void kernel(node * array, int numNodes, int id, int * ancestorID)
 {
-	int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	
-  
-  if (idx < numNodes)
+	//int idx = blockIdx.x * blockDim.x + threadIdx.x;
+ 
+  //if (idx < numNodes)
+//	{
+	int ancestorIndex = 0;
+  for(int i=0; i<numNodes; i++)
 	{
-    /**
-    for(int i = 0; i < numNodes; i++)
-    {
-      ancestorID2[i] = 1;
-		  ancestorID1[i] = 2;
-    
-    }**/
-
-    if (array[idx].nodeID == id1)
+		if (array[i].nodeID == id)
 		{
-			node temp = array[idx];
+			node temp = array[i];
 			while (temp.ancestor != 0)
 			{
-				for (int i=0; i<numNodes; i++)
-				{
-					if (ancestorID1[i] != 0)
-						continue;
-					ancestorID1[i] = temp.ancestor;
+				ancestorID[ancestorIndex++] = temp.ancestor;
 				}//for
-				for (int i=0; i<numNodes; i++)
+				for (int j=0; j<numNodes; i++)
 				{
-					if (array[i].nodeID == temp.ancestor)
+					if (array[j].nodeID == temp.ancestor)
 					{
-						temp = array[i];
+						temp = array[j];
 						break;
 					}//if
 				}//for
 			}//while
-		}//if	
-		else if (array[idx].nodeID == id2)
+		}//if
+	}//for
+/*	else if (array[idx].nodeID == id2)
 		{
 			node temp = array[idx];
 			while (temp.ancestor != 0)
@@ -82,17 +72,17 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 			}//while
 		}//if
 	}//if
+*/
 }//kernel
 
 
 int * shortestPath(node * phy, int numNodes, const char * label1, const char * label2)
 {
 	node * deviceArray;
-	int * deviceID1;
-	int * deviceID2;
+	int * deviceID;
 	int * ancestorID1 = new int[numNodes];
 	int * ancestorID2 = new int[numNodes];
-	float blockSize = 1024; //num threads per block
+	float blockSize = 2; //num threads per block
 
 	//check if invalid query
 	node temp1, temp2;
@@ -112,23 +102,19 @@ int * shortestPath(node * phy, int numNodes, const char * label1, const char * l
 	}//if
 
 	cudaMalloc(&deviceArray, sizeof(node) * numNodes);
-	cudaMalloc(&deviceID1, sizeof(int) * numNodes);
-	cudaMalloc(&deviceID2, sizeof(int) * numNodes);
+	cudaMalloc(&deviceID, sizeof(int) * numNodes);
 	cudaMemcpy(deviceArray, phy, sizeof(node) * numNodes, cudaMemcpyHostToDevice);	
-	cudaMemcpy(deviceID1, ancestorID1, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(deviceID2, ancestorID2, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
 
-	dim3 dimBlock(blockSize);
-	dim3 dimGrid(ceil(numNodes/blockSize));
-
-	//map phy to complete tree
-	printf("%d %d \n", temp1.nodeID, temp2.nodeID);
-  kernel <<< dimGrid, dimBlock >>> (deviceArray, numNodes, temp1.nodeID, temp2.nodeID, deviceID1, deviceID2);
-	cudaMemcpy(ancestorID1, deviceID1, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(deviceID, ancestorID1, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
+  kernel <<< 1, 1 >>> (deviceArray, numNodes, temp1.nodeID, deviceID);
+	cudaMemcpy(ancestorID1, deviceID, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
+  
+	
+	cudaMemcpy(deviceID, ancestorID2, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
+	kernel <<< 1, 1 >>> (deviceArray, numNodes, temp2.nodeID, deviceID);
 	cudaMemcpy(ancestorID2, deviceID2, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
 	cudaFree(deviceArray);
-	cudaFree(deviceID1);
-	cudaFree(deviceID2);
+	cudaFree(deviceID);
 
 	//find shortest path
 	int * path = new int[numNodes];
