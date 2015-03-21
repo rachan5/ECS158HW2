@@ -74,7 +74,7 @@ raschan@ucdavis.edu, ajuu@ucdavis.edu, bng@ucdavis.edu\\
 \begin{center}
 	\begin{large}
 		\textbf{Abstract}\\
-		This report attempts paralleize CRAN's phylobase package's shortestPath function in RSnow, OpenMP and CUDA. The function takes in a phylogeneic tree, two nodes in the tree and produces the shortest path of nodes inbetween them. The RSnow implementation built on top fo the existant code and paralleized the descendants function.The OpenMP implementation did a similar approach, except with \textbf{< ALICIA WHAT DID YOU DO>}. The CUDA implementation took the brute force approach to the  shortestPath problem. Overall, \textbf{< SENTENCE ABOUT TEST RESULTS >}. \textbf{< CLOSE WITH A MORE GENERAL STATEMENT BUILDING OFF RESULTS OF THE TESTS >} 
+		This report attempts paralleize CRAN's phylobase package's shortestPath function in RSnow, OpenMP and CUDA. The function takes in a phylogeneic tree, and produces the shortest path between two nodes. The RSnow implementation is built on top of the existant code and parallelizes the descendants function. The OpenMP implementation did a similar approach, by parallelizing the ancestors and descendants C functions. The CUDA implementation took the brute force approach to the  shortestPath problem. Overall, \textbf{< SENTENCE ABOUT TEST RESULTS >}. \textbf{< CLOSE WITH A MORE GENERAL STATEMENT BUILDING OFF RESULTS OF THE TESTS >} 
 	\end{large}
 	
 
@@ -157,7 +157,11 @@ descendants(tree, given_node){
 \end{lstlisting}
 
 \subsection{OpenMP}
-\textbf{ALICIA WRITE STUFF HERE}\\
+Because OpenMP allows parallelism to be added without changing a significant amount of existing code, we implement OpenMP code with minimal changes to the original phylobase program. 
+We decided to parallelize all serial C functions called and implied by the “shortest path” function in treewalk.R
+There are only two C functions implicitly called by the shortestPath function: one in ancestors.c and one in descendants.c. 
+Because of the serial “for” loops which comprised most of the ancestor and descendant C functions, the OpenMP implementation is embarrassingly parallel. The functions are also small so there isn't a need for explicit barriers or single/master calls.
+\\
 
 See code in Appendix A.2.\\
 
@@ -371,7 +375,7 @@ RSnowshortestPath <- function(phy, node1, node2,cls){
 
 \subsection{OpenMP Code}
 \begin{lstlisting}[style=MyC++Style]
-ALICIA CODE GOES HERE
+
 \end{lstlisting}
 
 \subsection{CUDA Code}
