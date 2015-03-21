@@ -5,16 +5,43 @@
 \usepackage{amssymb}
 \usepackage{listings}
 \usepackage{color}
+\usepackage{textcomp}
 %\usepackage{bbm}
 %\usepackage{url}
 
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygrey}{rgb}{0.5,0.5,0.5}
+\definecolor{listinggray}{gray}{0.5}
+\definecolor{lbcolor}{rgb}{0.8,0.8,0.8}
 
 \lstdefinestyle{numbers} {numbers=left, stepnumber=1, numberstyle=\tiny, numbersep=10pt}
 \lstdefinestyle{MyFrame}{backgroundcolor=\color{yellow},frame=shadowbox}
 
-\lstdefinestyle{MyC++Style} {language=C++,style=numbers,style=MyFrame,frame=none,backgroundcolor={}}
+\lstdefinestyle{MyC++Style} {
+backgroundcolor=\color{white},
+    tabsize=4,    
+%   rulecolor=,
+    language=[GNU]C++,
+        basicstyle=\scriptsize,
+        upquote=true,
+        aboveskip={1.5\baselineskip},
+        columns=fixed,
+        showstringspaces=false,
+        extendedchars=false,
+        breaklines=true,
+        prebreak = \raisebox{0ex}[0ex][0ex]{\ensuremath{\hookleftarrow}},
+        frame=single,
+        numbers=left,
+        showtabs=false,
+        showspaces=false,
+        showstringspaces=false,
+        identifierstyle=\ttfamily,
+        keywordstyle=\color[rgb]{0,0,1},
+        commentstyle=\color[rgb]{0.026,0.112,0.095},
+        stringstyle=\color[rgb]{0.627,0.126,0.941},
+        numberstyle=\color[rgb]{0.205, 0.142, 0.73},
+}
+
 \lstdefinestyle{MyR}{
 	backgroundcolor = \color{white},
 	commentstyle  = \color{mygreen},
@@ -25,7 +52,23 @@
 	numbersep = 8pt,
 	numberstyle = \color{mygrey},
 }
-\lstset{language=C++,frame=none}
+
+\lstset{backgroundcolor=\color{lbcolor},
+  tabsize=4,
+  language=C++,
+  captionpos=b,
+  frame=lines,
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=5pt,
+  breaklines=true,
+  showstringspaces=false,
+  basicstyle=\footnotesize,
+%  identifierstyle=\color{magenta},
+  keywordstyle=\color[rgb]{0,0,1},
+  commentstyle=\color{Darkgreen},
+  stringstyle=\color{red}}
+  
 \lstset{language=R,frame=none}
 
 % Use this space to define/redefine commands.  This is a really useful trick if there's some 
@@ -60,8 +103,7 @@
 {\huge \textbf{ECS 158 Final Project: An Attempt At Parallelizing R's Phylobase::ShortestPath()}\\
 \vspace{5mm}
 \begin{Large}
-Raymond S. Chan, Alicia Luu, Bryan Ng
-997544611, 999999999, 999999999\\
+Raymond S. Chan, Alicia Luu, Bryan Ng\\
 raschan@ucdavis.edu, ajuu@ucdavis.edu, bng@ucdavis.edu\\
 \end{Large}}
 \end{center}
@@ -212,7 +254,7 @@ TALK ABOUT BIG O's.\\
 
 \subsection{CUDA}
 
-\textbf{THIS IS JUST A GUESS.}\\ Compared to the serial version, the cuda implementation performed slower in most test cases. While the cuda version can compute both given node’s ancestors at the same time, it must also load the entire tree into the GPU’s memory.\\
+Compared to the serial version, the cuda implementation performed slower in most test cases. While the cuda version can compute both given node’s ancestors at the same time, it must also load the entire tree into the GPU’s memory.\\
 
 \section{Conclusion}
 
@@ -376,11 +418,665 @@ RSnowshortestPath <- function(phy, node1, node2,cls){
 \subsection{OpenMP Code}
 \begin{lstlisting}[style=MyC++Style]
 
+#include <R.h>
+#include <Rinternals.h>
+#include "omp.h"
+int num_threads=8;
+void omp_set_num_threads(int num_threads);
+
+SEXP OMPancestors(SEXP nod, SEXP anc, SEXP des) {
+
+    int numEdges = length(anc);
+    int numNodes = length(nod);
+
+    int* nodes = INTEGER(nod);
+    int* ancestor = INTEGER(anc);
+    int* descendant = INTEGER(des);
+
+    int parent = 0;
+    SEXP isAncestor;
+
+    PROTECT(isAncestor = allocMatrix(INTSXP, numEdges, numNodes));
+ #pragma omp parallel for collapse(2)
+    for (int n=0; n<numNodes; n++) {
+	//#pragma omp parallel for
+        for (int i=0; i<numEdges; i++) {
+            if (nodes[n]==descendant[i]) {
+                INTEGER(isAncestor)[i + n*numEdges] = 1;
+            } else {
+                INTEGER(isAncestor)[i + n*numEdges] = 0;
+            }
+        }
+    }
+
+#pragma omp parallel for collapse(2)
+    for (int n=0; n<numNodes; n++) {
+	//#pragma omp parallel for
+        for (int i=0; i<numEdges; i++) {
+            if (INTEGER(isAncestor)[i + n*numEdges]==1) {
+                parent = ancestor[i];
+                for (int j=i+1; j<numEdges; j++) {
+                    if (descendant[j]==parent) {
+                        INTEGER(isAncestor)[j + n*numEdges]=1; 
+                    }
+                }
+            }
+        }
+    }
+
+    UNPROTECT(1);
+    return isAncestor;
+}
+
+SEXP OMPdescendants(SEXP nod, SEXP anc, SEXP des) {
+
+    int numEdges = length(anc);
+    int numNodes = length(nod);
+
+    int* nodes = INTEGER(nod);
+    int* ancestor = INTEGER(anc);
+    int* descendant = INTEGER(des);
+
+    int child = 0;
+    SEXP isDescendant;
+
+    PROTECT(isDescendant = allocMatrix(INTSXP, numEdges, numNodes));
+#pragma omp parallel for collapse(2) 
+   for (int n=0; n<numNodes; n++) {
+        for (int i=0; i<numEdges; i++) {
+            if (nodes[n]==descendant[i]) {
+                INTEGER(isDescendant)[i + n*numEdges] = 1;
+            } else {
+                INTEGER(isDescendant)[i + n*numEdges] = 0;
+            }
+        }
+    }
+
+#pragma omp parallel for collapse(2)
+    for (int n=0; n<numNodes; n++) {
+        for (int i=0; i<numEdges; i++) {
+            if (INTEGER(isDescendant)[i + n*numEdges]==1) {
+                child = descendant[i];
+                for (int j=i+1; j<numEdges; j++) {
+                    if (ancestor[j]==child) {
+                        INTEGER(isDescendant)[j + n*numEdges] = 1; 
+                    }
+                }
+            }
+        }
+    }
+    UNPROTECT(1);
+    return isDescendant;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=MyR]
+## get descendants [recursively]
+OMPdescendants <- function (phy, node, type=c("tips","children","all")) {
+    type <- match.arg(type)
+
+    ## look up nodes, warning about and excluding invalid nodes
+    oNode <- node
+    node <- getNode(phy, node, missing="warn")
+    isValid <- !is.na(node)
+    node <- as.integer(node[isValid])
+
+    if (type == "children") {
+        res <- lapply(node, function(x) children(phy, x))
+        ## if just a single node, return as a single vector
+        if (length(res)==1) res <- res[[1]]
+    } else {
+        ## edge matrix must be in preorder for the C function!
+        if (phy@order=="preorder") {
+            edge <- phy@edge
+        } else {
+            edge <- reorder(phy, order="preorder")@edge
+        }
+        ## extract edge columns
+        ancestor <- as.integer(edge[, 1])
+        descendant <- as.integer(edge[, 2])
+        
+        ## TODO: REPLACE C call with OMP inplementation of descendants
+        ## return indicator matrix of ALL descendants (including self)
+        isDes <- .Call("OMPdescendants", node, ancestor, descendant)
+        storage.mod## get descendants [recursively]
+OMPdescendants <- function (phy, node, type=c("tips","children","all")) {
+    type <- match.arg(type)
+
+    ## look up nodes, warning about and excluding invalid nodes
+    oNode <- node
+    node <- getNode(phy, node, missing="warn")
+    isValid <- !is.na(node)
+    node <- as.integer(node[isValid])
+
+    if (type == "children") {
+        res <- lapply(node, function(x) children(phy, x))
+        ## if just a single node, return as a single vector
+        if (length(res)==1) res <- res[[1]]
+    } else {
+        ## edge matrix must be in preorder for the C function!
+        if (phy@order=="preorder") {
+            edge <- phy@edge
+        } else {
+            edge <- reorder(phy, order="preorder")@edge
+        }
+        ## extract edge columns
+        ancestor <- as.integer(edge[, 1])
+        descendant <- as.integer(edge[, 2])
+        
+        ## TODO: REPLACE C call with OMP inplementation of descendants
+        ## return indicator matrix of ALL descendants (including self)
+        isDes <- .Call("OMPdescendants", node, ancestor, descendant)
+        storage.mode(isDes) <- "logical"
+
+        ## for internal nodes only, drop self (not sure why this rule?)
+        int.node <- intersect(node, nodeId(phy, "internal"))
+        isDes[cbind(match(int.node, descendant),
+            match(int.node, node))] <- FALSE
+        
+        ## if only tips desired, drop internal nodes
+        if (type=="tips") {
+            isDes[descendant %in% nodeId(phy, "internal"),] <- FALSE
+        }
+        
+        res <- getNode(phy, descendant[isDes[, seq_along(node)]])
+    }
+
+    res
+}#OMPdescendants
+
+## get ancestors (all nodes)
+OMPancestors <- function (phy, node, type=c("all","parent","ALL")) {
+    type <- match.arg(type)
+
+    ## look up nodes, warning about and excluding invalid nodes
+    oNode <- node
+    node <- getNode(phy, node, missing="warn")
+    isValid <- !is.na(node)
+    node <- as.integer(node[isValid])
+
+    if (length(node) == 0) {
+      return(NA)
+    }
+    
+    if (type == "parent") {
+        res <- lapply(node, function(x) ancestor(phy, x))
+    } else {
+        ## edge matrix must be in postorder for the C function!
+        if (phy@order=="postorder") {
+            edge <- phy@edge
+        } else {
+            edge <- reorder(phy, order="postorder")@edge
+        }
+        ## extract edge columns
+        ancestor <- as.integer(edge[, 1])
+        descendant <- as.integer(edge[, 2])
+        
+        ## TODO: REPLACE C call with OMP inplementation of ancestors
+        ## return indicator matrix of ALL ancestors (including self)
+        isAnc <- .Call("OMPancestors", node, ancestor, descendant)
+        storage.mode(isAnc) <- "logical"
+
+        ## drop self if needed
+        if (type=="all") {
+            isAnc[cbind(match(node, descendant), seq_along(node))] <- FALSE
+        }
+        res <- lapply(seq_along(node), function(n) getNode(phy,
+            descendant[isAnc[,n]]))
+    }
+    names(res) <- as.character(oNode[isValid])
+
+    ## if just a single node, return as a single vector
+    if (length(res)==1) res <- res[[1]]
+    res
+}#OMPancestors
+
+OMPMRCA <- function(phy, ...) {
+    nodes <- list(...)
+    ## if length==1 and first element is a vector,
+    ##   use it as the list
+    if (length(nodes)==1 && length(nodes[[1]])>1) {
+        nodes <- as.list(nodes[[1]])
+    }
+
+    ## Correct behavior when the root is part of the nodes
+    testNodes <- lapply(nodes, getNode, x=phy)
+    ## BMB: why lapply, not sapply?
+    lNodes <- unlist(testNodes)
+    if (any(is.na(lNodes)))
+      stop("nodes not found in tree: ",paste(names(lNodes)[is.na(lNodes)],
+                                             collapse=", "))
+    uniqueNodes <- unique(testNodes)
+    root <- nTips(phy)+1
+    ## Handles case where root is a node of interest, return root
+    if(root %in% uniqueNodes) {
+        res <- getNode(phy, root)
+        return(res)
+    }
+    ## Correct behavior in case of MRCA of identical taxa
+    if(length(uniqueNodes) == 1) {
+        res <- uniqueNodes[[1]]
+        return(res)
+    }
+    else { ## else length(uniqueNodes > 1)
+        ancests <- lapply(nodes, OMPancestors, phy=phy, type="ALL")
+        res <- getNode(phy, max(Reduce(intersect, ancests)))
+        return(res)
+    }
+}#OMPMRCA
+
+
+###############
+# shortestPath
+###############
+OMPshortestPath <- function(phy, node1, node2){
+  ## conversion from phylo, phylo4 and phylo4d
+  if (class(phy) == "phylo4d") {
+    x <- extractTree(phy)
+  }
+  else if (class(phy) != "phylo4"){
+    x <- as(phy, "phylo4")
+  }
+
+    ## some checks
+    ## if (is.character(checkval <- checkPhylo4(x))) stop(checkval) # no need
+    t1 <- getNode(x, node1)
+    t2 <- getNode(x, node2)
+    if(any(is.na(c(t1,t2)))) stop("wrong node specified")
+    if(t1==t2) return(NULL)
+
+    ## main computations
+    comAnc <- OMPMRCA(x, t1, t2) # common ancestor
+    desComAnc <- OMPdescendants(x, comAnc, type="all")
+    ancT1 <- OMPancestors(x, t1, type="all")
+    path1 <- intersect(desComAnc, ancT1) # path: common anc -> t1
+
+    ancT2 <- OMPancestors(x, t2, type="all")
+    path2 <- intersect(desComAnc, ancT2) # path: common anc -> t2
+
+    res <- union(path1, path2) # union of the path
+    ## add the common ancestor if it differs from t1 or t2
+    if(!comAnc %in% c(t1,t2)){
+        res <- c(comAnc,res)
+    }
+
+    res <- getNode(x, res)
+
+    return(res)
+} # end shortestPathe(isDes) <- "logical"
+
+        ## for internal nodes only, drop self (not sure why this rule?)
+        int.node <- intersect(node, nodeId(phy, "internal"))
+        isDes[cbind(match(int.node, descendant),
+            match(int.node, node))] <- FALSE
+        
+        ## if only tips desired, drop internal nodes
+        if (type=="tips") {
+            isDes[descendant %in% nodeId(phy, "internal"),] <- FALSE
+        }
+        
+        res <- getNode(phy, descendant[isDes[, seq_along(node)]])
+    }
+
+    res
+}#OMPdescendants
+
+## get ancestors (all nodes)
+OMPancestors <- function (phy, node, type=c("all","parent","ALL")) {
+    type <- match.arg(type)
+
+    ## look up nodes, warning about and excluding invalid nodes
+    oNode <- node
+    node <- getNode(phy, node, missing="warn")
+    isValid <- !is.na(node)
+    node <- as.integer(node[isValid])
+
+    if (length(node) == 0) {
+      return(NA)
+    }
+    
+    if (type == "parent") {
+        res <- lapply(node, function(x) ancestor(phy, x))
+    } else {
+        ## edge matrix must be in postorder for the C function!
+        if (phy@order=="postorder") {
+            edge <- phy@edge
+        } else {
+            edge <- reorder(phy, order="postorder")@edge
+        }
+        ## extract edge columns
+        ancestor <- as.integer(edge[, 1])
+        descendant <- as.integer(edge[, 2])
+        
+        ## TODO: REPLACE C call with OMP inplementation of ancestors
+        ## return indicator matrix of ALL ancestors (including self)
+        isAnc <- .Call("OMPancestors", node, ancestor, descendant)
+        storage.mode(isAnc) <- "logical"
+
+        ## drop self if needed
+        if (type=="all") {
+            isAnc[cbind(match(node, descendant), seq_along(node))] <- FALSE
+        }
+        res <- lapply(seq_along(node), function(n) getNode(phy,
+            descendant[isAnc[,n]]))
+    }
+    names(res) <- as.character(oNode[isValid])
+
+    ## if just a single node, return as a single vector
+    if (length(res)==1) res <- res[[1]]
+    res
+}#OMPancestors
+
+OMPMRCA <- function(phy, ...) {
+    nodes <- list(...)
+    ## if length==1 and first element is a vector,
+    ##   use it as the list
+    if (length(nodes)==1 && length(nodes[[1]])>1) {
+        nodes <- as.list(nodes[[1]])
+    }
+
+    ## Correct behavior when the root is part of the nodes
+    testNodes <- lapply(nodes, getNode, x=phy)
+    ## BMB: why lapply, not sapply?
+    lNodes <- unlist(testNodes)
+    if (any(is.na(lNodes)))
+      stop("nodes not found in tree: ",paste(names(lNodes)[is.na(lNodes)],
+                                             collapse=", "))
+    uniqueNodes <- unique(testNodes)
+    root <- nTips(phy)+1
+    ## Handles case where root is a node of interest, return root
+    if(root %in% uniqueNodes) {
+        res <- getNode(phy, root)
+        return(res)
+    }
+    ## Correct behavior in case of MRCA of identical taxa
+    if(length(uniqueNodes) == 1) {
+        res <- uniqueNodes[[1]]
+        return(res)
+    }
+    else { ## else length(uniqueNodes > 1)
+        ancests <- lapply(nodes, OMPancestors, phy=phy, type="ALL")
+        res <- getNode(phy, max(Reduce(intersect, ancests)))
+        return(res)
+    }
+}#OMPMRCA
+
+
+###############
+# shortestPath
+###############
+OMPshortestPath <- function(phy, node1, node2){
+  ## conversion from phylo, phylo4 and phylo4d
+  if (class(phy) == "phylo4d") {
+    x <- extractTree(phy)
+  }
+  else if (class(phy) != "phylo4"){
+    x <- as(phy, "phylo4")
+  }
+
+    ## some checks
+    ## if (is.character(checkval <- checkPhylo4(x))) stop(checkval) # no need
+    t1 <- getNode(x, node1)
+    t2 <- getNode(x, node2)
+    if(any(is.na(c(t1,t2)))) stop("wrong node specified")
+    if(t1==t2) return(NULL)
+
+    ## main computations
+    comAnc <- OMPMRCA(x, t1, t2) # common ancestor
+    desComAnc <- OMPdescendants(x, comAnc, type="all")
+    ancT1 <- OMPancestors(x, t1, type="all")
+    path1 <- intersect(desComAnc, ancT1) # path: common anc -> t1
+
+    ancT2 <- OMPancestors(x, t2, type="all")
+    path2 <- intersect(desComAnc, ancT2) # path: common anc -> t2
+
+    res <- union(path1, path2) # union of the path
+    ## add the common ancestor if it differs from t1 or t2
+    if(!comAnc %in% c(t1,t2)){
+        res <- c(comAnc,res)
+    }
+
+    res <- getNode(x, res)
+
+    return(res)
+} # end shortestPath
 \end{lstlisting}
 
 \subsection{CUDA Code}
+
+Here are some highlights of the coming CUDA code.\\
+
+Line 7: Node struct – contains information about tree's nodes (node id, ancestor id, node label) \\
+
+Line 13: setNode function – translates R tree nodes to node structs \\
+
+Line 22: kernel function – GPU function that computes ancestors of all nodes in the tree \\
+
+Line 67: shortestPath function – takes an array of nodes, number of nodes given, and two character array labels and finds the shortest path between the given nodes. An error message is printed if the given nodes are invalid input (ex: they are a parent-child) \\
+
+Line 196: main function – driver function, reads in input and calls the shortestPath function \\
+
 \begin{lstlisting}[style=MyC++Style]
-BRYAN CODE GOES HERE
+#include <stdio.h>
+#include <stdlib.h>
+#include <cuda.h>
+
+//to compile: nvcc shortestPath.cu
+
+struct node
+{
+	int nodeID, ancestor;
+	char label[20]; //max size of label is 20
+};//node
+
+void setNode(node &phy, int numNodes, int id, int aID, char * label)
+{
+	phy.nodeID = id;
+	phy.ancestor = aID;
+	memset(phy.label, '\0', sizeof(label));
+	strcpy(phy.label, label);
+}//setNode
+
+
+__global__ void kernel(node * array, int numNodes, int id1, int id2,
+											int * ancestorID1, int * ancestorID2)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < numNodes)
+	{
+		if (array[idx].nodeID == id1) //if found target node
+		{
+			int ancestorIndex = 0;
+			node temp = array[idx]; //start from current node
+			while (temp.ancestor != 0)
+			{
+				ancestorID1[ancestorIndex++] = temp.ancestor; //add all ancestors
+				for (int i=0; i<numNodes; i++)
+				{
+					if (array[i].nodeID == temp.ancestor)
+					{
+						temp = array[i];
+						break;
+					}//if
+				}//for
+			}//while
+		}//if	
+		else if (array[idx].nodeID == id2) //if found target node
+		{
+			int ancestorIndex = 0;
+			node temp = array[idx]; //start from current node
+			while (temp.ancestor != 0)
+			{
+				ancestorID2[ancestorIndex++] = temp.ancestor; //add all ancestors
+				for (int i=0; i<numNodes; i++)
+				{
+					if (array[i].nodeID == temp.ancestor)
+					{
+						temp = array[i];
+						break;
+					}//if
+				}//for
+			}//while
+		}//if
+	
+	}//if
+}//kernel
+
+
+void shortestPath(node * phy, int numNodes, char * label1, char * label2)
+{
+	node * deviceArray;
+	int * deviceID1;
+	int * deviceID2;
+	int * ancestorID1 = new int[numNodes]; //initialize max size to number of nodes
+	int * ancestorID2 = new int[numNodes];
+	float blockSize = 1024; //num threads per block
+
+	//check if invalid query
+	node temp1, temp2;
+	for (int i=0; i<numNodes; i++)
+	{
+		ancestorID1[i] = 0;
+		ancestorID2[i] = 0;
+		if (strcmp(label1, phy[i].label) == 0)
+			temp1 = phy[i];
+		else if (strcmp(label2, phy[i].label) == 0)
+			temp2 = phy[i];
+	}//for
+
+	if ((temp1.ancestor == temp2.nodeID) || (temp2.ancestor == temp1.nodeID))
+	{
+		printf("named integer(0)\n");
+		return;
+	}//if
+
+	//allocate device memory
+	cudaMalloc(&deviceArray, sizeof(node) * numNodes);
+	cudaMalloc(&deviceID1, sizeof(int) * numNodes);
+	cudaMalloc(&deviceID2, sizeof(int) * numNodes);
+	cudaMemcpy(deviceArray, phy, sizeof(node) * numNodes, cudaMemcpyHostToDevice);	
+	cudaMemcpy(deviceID1, ancestorID1, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(deviceID2, ancestorID2, sizeof(int) * numNodes, cudaMemcpyHostToDevice);
+
+	dim3 dimBlock(blockSize);
+	dim3 dimGrid(ceil(numNodes/blockSize));
+
+	//compute ancestors
+	kernel <<< dimGrid, dimBlock >>> (deviceArray, numNodes, temp1.nodeID, temp2.nodeID, deviceID1, deviceID2);
+	cudaMemcpy(ancestorID1, deviceID1, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(ancestorID2, deviceID2, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
+	cudaFree(deviceArray);
+	cudaFree(deviceID1);
+	cudaFree(deviceID2);
+
+	//find shortest path
+	int * path = new int[numNodes];
+	int currentPath = ancestorID1[0];
+	int pathIndex = 0;
+	bool isLCAPath = false;
+	//check if path converges at LCA
+	for (int i=0; i<numNodes; i++)
+	{
+		path[i] = 0;
+		if (temp1.nodeID == ancestorID2[i])
+		{
+			for (int j=0; j<i; j++)
+				path[j] = ancestorID2[j];
+			isLCAPath = true;
+			break;
+		}//if	
+		else if (temp2.nodeID == ancestorID1[i])
+		{	
+			for (int j=0; j<i; j++)
+				path[j] = ancestorID1[j];
+			isLCAPath = true;
+			break;
+		}//else if
+	}//for
+
+	//if one node is the ancestor of another
+	if (!isLCAPath)
+	{
+		for(int i=0; i<numNodes; i++)
+		{	
+			for (int j=0; j<numNodes; j++)
+			{
+				if (currentPath == ancestorID2[j])
+					break;
+				if ((ancestorID2[j] == 0) || (j == numNodes-1))
+				{
+					path[pathIndex++] = ancestorID1[i];
+					currentPath = ancestorID1[i];
+					break;
+				}//if
+			}//for	
+		}//for		
+
+		if (pathIndex == 0)	
+			path[pathIndex++] = currentPath;
+	
+		for (int i=0; i<numNodes; i++)
+		{
+			if (ancestorID2[i] == currentPath)
+				break;
+			path[pathIndex++] = ancestorID2[i];
+		}//for
+	}//if
+
+	for (int i=0; i<numNodes; i++)
+	{
+		if (path[i] == 0)
+			break;
+		for (int j=0; j<numNodes; j++)
+		{
+			if (path[i] == phy[j].nodeID)
+			{
+				printf("%s ", phy[j].label);
+				break;
+			}//if
+		}//for
+	}//for
+
+	printf("\n");
+	for (int i=0; i<numNodes; i++)
+	{
+		if (path[i] == 0)
+			break;
+		printf("%d ", path[i]);	
+	}//for
+	printf("\n");
+
+	delete [] ancestorID1;
+	delete [] ancestorID2;
+	delete [] path;
+}//shortestPath
+
+
+int main()
+{
+	int numNodes = 27;
+	node * phy = new node[numNodes];
+	FILE * infile = fopen("geospiza", "r");
+	
+	int nodeID, ancestor;
+	char label[20];
+	for (int i=0; i<numNodes; i++)
+	{
+		fscanf(infile, "%d", &nodeID);
+		fscanf(infile, "%d", &ancestor);
+		fscanf(infile, "%s", &label);
+		setNode(phy[i], numNodes, nodeID, ancestor, label);
+	}//for
+	fclose(infile);
+
+//test shortest path
+	shortestPath(phy, numNodes, "fusca", "fortis"); 
+	
+	delete [] phy;
+	return 0;
+}//main
+
+
 \end{lstlisting}
 
 \section{Who Did What} \label{App:AppendixB}
