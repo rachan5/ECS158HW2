@@ -7,8 +7,7 @@
 struct node
 {
 	int nodeID, ancestor;
-	char label[20];
-	//nodeType - 0 = root, 1 = internal, 2 = tip
+	char label[20]; //max size of label is 20
 };//node
 
 void setNode(node &phy, int numNodes, int id, int aID, char * label)
@@ -26,13 +25,13 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < numNodes)
 	{
-		if (array[idx].nodeID == id1)
+		if (array[idx].nodeID == id1) //if found target node
 		{
 			int ancestorIndex = 0;
-			node temp = array[idx];
+			node temp = array[idx]; //start from current node
 			while (temp.ancestor != 0)
 			{
-				ancestorID1[ancestorIndex++] = temp.ancestor;
+				ancestorID1[ancestorIndex++] = temp.ancestor; //add all ancestors
 				for (int i=0; i<numNodes; i++)
 				{
 					if (array[i].nodeID == temp.ancestor)
@@ -43,13 +42,13 @@ __global__ void kernel(node * array, int numNodes, int id1, int id2,
 				}//for
 			}//while
 		}//if	
-		else if (array[idx].nodeID == id2)
+		else if (array[idx].nodeID == id2) //if found target node
 		{
 			int ancestorIndex = 0;
-			node temp = array[idx];
+			node temp = array[idx]; //start from current node
 			while (temp.ancestor != 0)
 			{
-				ancestorID2[ancestorIndex++] = temp.ancestor;
+				ancestorID2[ancestorIndex++] = temp.ancestor; //add all ancestors
 				for (int i=0; i<numNodes; i++)
 				{
 					if (array[i].nodeID == temp.ancestor)
@@ -70,7 +69,7 @@ void shortestPath(node * phy, int numNodes, char * label1, char * label2)
 	node * deviceArray;
 	int * deviceID1;
 	int * deviceID2;
-	int * ancestorID1 = new int[numNodes];
+	int * ancestorID1 = new int[numNodes]; //initialize max size to number of nodes
 	int * ancestorID2 = new int[numNodes];
 	float blockSize = 1024; //num threads per block
 
@@ -92,6 +91,7 @@ void shortestPath(node * phy, int numNodes, char * label1, char * label2)
 		return;
 	}//if
 
+	//allocate device memory
 	cudaMalloc(&deviceArray, sizeof(node) * numNodes);
 	cudaMalloc(&deviceID1, sizeof(int) * numNodes);
 	cudaMalloc(&deviceID2, sizeof(int) * numNodes);
@@ -102,7 +102,7 @@ void shortestPath(node * phy, int numNodes, char * label1, char * label2)
 	dim3 dimBlock(blockSize);
 	dim3 dimGrid(ceil(numNodes/blockSize));
 
-	//map phy to complete tree
+	//compute ancestors
 	kernel <<< dimGrid, dimBlock >>> (deviceArray, numNodes, temp1.nodeID, temp2.nodeID, deviceID1, deviceID2);
 	cudaMemcpy(ancestorID1, deviceID1, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
 	cudaMemcpy(ancestorID2, deviceID2, sizeof(int) * numNodes, cudaMemcpyDeviceToHost);
@@ -115,6 +115,7 @@ void shortestPath(node * phy, int numNodes, char * label1, char * label2)
 	int currentPath = ancestorID1[0];
 	int pathIndex = 0;
 	bool isLCAPath = false;
+	//check if path converges at LCA
 	for (int i=0; i<numNodes; i++)
 	{
 		path[i] = 0;
@@ -134,6 +135,7 @@ void shortestPath(node * phy, int numNodes, char * label1, char * label2)
 		}//else if
 	}//for
 
+	//if one node is the ancestor of another
 	if (!isLCAPath)
 	{
 		for(int i=0; i<numNodes; i++)
