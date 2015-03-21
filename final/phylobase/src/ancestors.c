@@ -13,6 +13,9 @@
 
 #include <R.h>
 #include <Rinternals.h>
+#include "omp.h"
+int num_threads=8;
+void omp_set_num_threads(int num_threads);
 
 SEXP ancestors(SEXP nod, SEXP anc, SEXP des) {
 
@@ -27,7 +30,9 @@ SEXP ancestors(SEXP nod, SEXP anc, SEXP des) {
     SEXP isAncestor;
 
     PROTECT(isAncestor = allocMatrix(INTSXP, numEdges, numNodes));
+ #pragma omp parallel for collapse(2)
     for (int n=0; n<numNodes; n++) {
+	//#pragma omp parallel for
         for (int i=0; i<numEdges; i++) {
             if (nodes[n]==descendant[i]) {
                 INTEGER(isAncestor)[i + n*numEdges] = 1;
@@ -36,7 +41,10 @@ SEXP ancestors(SEXP nod, SEXP anc, SEXP des) {
             }
         }
     }
+
+#pragma omp parallel for collapse(2)
     for (int n=0; n<numNodes; n++) {
+	//#pragma omp parallel for
         for (int i=0; i<numEdges; i++) {
             if (INTEGER(isAncestor)[i + n*numEdges]==1) {
                 parent = ancestor[i];
@@ -48,6 +56,8 @@ SEXP ancestors(SEXP nod, SEXP anc, SEXP des) {
             }
         }
     }
+
+
     UNPROTECT(1);
     return isAncestor;
 }
