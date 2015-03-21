@@ -100,7 +100,7 @@ backgroundcolor=\color{white},
 % text size, choose one of (in decreasing order) \Huge, \huge, \LARGE, \Large, \large, \small,
 % \footnotesize, \tiny.  By default, your text is \normalsize.
 \begin{center}
-{\huge \textbf{ECS 158 Final Project: An Attempt At Parallelizing R's Phylobase::ShortestPath()}\\
+{\huge \textbf{ECS 158 Final Project:Parallelizing R's Phylobase::ShortestPath()}\\
 \vspace{5mm}
 \begin{Large}
 Raymond S. Chan, Alicia Luu, Bryan Ng\\
@@ -122,7 +122,7 @@ This report attempts to parallelize CRAN's phylobase package's shortestPath func
 
 \section{Introduction and Motivation}
  
-Alongside the rise of "big data" in the recent years, bioinformatics has gained considerable momentum. But the a consistent issue remains: what do we do with all the data and how do we make sense of it at a reasonable rate? The R community has attempted to resolute these issues. For this report, we are examining the R's phylobase package, which provides the base class and functions for phylogenetic or evolutionary structures and comparative data. We will be focusing our efforts in making the "treewalk" utility functions, such as finding descendants/ancestors and shortest paths quickly through three different parallel programming models (RSnow, OpenMP and CUDA).  
+Alongside the rise of "big data" in the recent years, bioinformatics has gained considerable momentum. But a consistent issue remains: what do we do with all the data and how do we make sense of it at a reasonable rate? The R community has attempted to resolute these issues. For this report, we are examining the R's phylobase package, which provides the base class and functions for phylogenetic or evolutionary structures and comparative data. We will be focusing our efforts in making the "treewalk" utility functions, such as finding descendants/ancestors and shortest paths quickly through three different parallel programming models (RSnow, OpenMP and CUDA).  
 
 
 \section{Approaches}
@@ -258,7 +258,7 @@ c(1.783, 1.841, 1.820, 1.751, 1.805, 1.830, 1.796, 1.705, 1.733, 1.784)
 \section{Discussion}
 
 \subsection{RSnow}
-The RSnow version was tested with four localhost worker nodes. The large majority of its runs were slower than the serial version. Looking back at our appraoch to the prolem, it was quite resource, specifically memory hungry. It was not a good idea for have four localhost nodes tackle the issue. \\
+The RSnow version was tested with four localhost worker nodes. The large majority of the runs were slower than the serial version. Looking back at our appraoch to the problem, it was quite resource, specifically memory hungry. It was not a good idea for have four localhost nodes tackle the issue. \\
 
 \subsection{OpenMP}
 The OpenMP version works marginally faster than the original code on large phylogenic trees (approximately 10000 leaves). With small trees, serial "for" loops seem to be efficient in finding ancestor and decsendent nodes. \\
@@ -283,7 +283,8 @@ We would like to thank Professor Norman Matloff for his guidance and knowledge p
 \section{Codes} \label{App:AppendixA}
 % the \\ insures the section title is centered below the phrase: AppendixA
 
-INSERT ALL CODES HERE ALONG WITH A PARAGRAPH EXPLAINING IT
+The RSnow descendant functions calculates decesdant in reverse by looking at ancestors.
+
 \subsection{RSnow Code}
 \begin{lstlisting}[style=MyR]
 SNOW <- function(x,size,root,type=c("descendants")){
@@ -430,6 +431,8 @@ RSnowshortestPath <- function(phy, node1, node2,cls){
 \end{lstlisting}
 
 \subsection{OpenMP Code}
+
+As stated approve in the approach section, very few lines were changed. OMP for's were added everywhere. The R code was modified so it would not interfere with the original code syntactically. 
 \begin{lstlisting}[style=MyC++Style]
 
 #include <R.h>
